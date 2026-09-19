@@ -1,0 +1,26 @@
+{
+  "name": "posture-check",
+  "private": true,
+  "packageManager": "pnpm@12.4.2",
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:desktop": "turbo run dev --filter=@posture-check/desktop",
+    "dev:mobile": "turbo run dev --filter=@posture-check/mobile",
+    "build": "turbo run build",
+    "build:desktop": "turbo run build --filter=@posture-check/desktop",
+    "build:mobile": "turbo run build --filter=@posture-check/mobile",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "test": "turbo run test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\""
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.1",
+    "@typescript-eslint/eslint-plugin": "^8.24.0",
+    "@typescript-eslint/parser": "^8.24.0",
+    "eslint": "^8.57.1",
+    "prettier": "^3.5.1",
+    "turbo": "^2.4.2",
+    "typescript": "^5.7.3"
+  }
+}
