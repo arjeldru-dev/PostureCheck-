@@ -134,13 +134,7 @@ export interface UserAchievement {
  * Mascot & Messages
  */
 export type MascotState =
-  | 'idle'
-  | 'reminding'
-  | 'encouraging'
-  | 'celebrating'
-  | 'concerned'
-  | 'sleeping'
-  | 'disappointed';
+  'idle' | 'reminding' | 'encouraging' | 'celebrating' | 'concerned' | 'sleeping' | 'disappointed';
 
 export type MascotTone = 'encouraging' | 'sassy' | 'minimal';
 

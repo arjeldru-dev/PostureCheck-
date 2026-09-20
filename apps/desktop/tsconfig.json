@@ -4,20 +4,20 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "composite": true,
-    "declaration": true,
-    "declarationMap": true
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@posture-check/shared": ["../../packages/shared/src/index.ts"]
+    }
   },
-  "files": [],
-  "references": [
-    { "path": "./packages/shared" },
-    { "path": "./packages/ui" },
-    { "path": "./apps/desktop" }
-  ]
+  "include": ["src/**/*", "vite.config.ts"],
+  "references": [{ "path": "../../packages/shared" }]
 }

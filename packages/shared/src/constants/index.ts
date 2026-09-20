@@ -1,4 +1,9 @@
-import type { Achievement, IntensityConfig, IntensityLevel, LevelProgression } from '../types/index.js';
+import type {
+  Achievement,
+  IntensityConfig,
+  IntensityLevel,
+  LevelProgression,
+} from '../types/index.js';
 
 /**
  * Gamification & XP Rules
