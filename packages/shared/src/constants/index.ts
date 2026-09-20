@@ -203,3 +203,5 @@ export const COLOR_TOKENS = {
   coralAlert: '#FF7043',
   skyBlue: '#42A5F5',
 } as const;
+
+export * from './design-tokens';

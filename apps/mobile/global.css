@@ -1,3 +1,97 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --color-frog-green: #4CAF50;
+    --color-frog-green-secondary: #66BB6A;
+    --color-lily-pad: #81C784;
+    --color-pond-dark: #1A2332;
+    --color-pond-light: #F5F7FA;
+    --color-golden-xp: #FFD54F;
+    --color-coral-alert: #FF7043;
+    --color-sky-blue: #42A5F5;
+    --color-surface-dark: #243447;
+    --color-surface-light: #FFFFFF;
+    --color-surface-card: #1f2c3d;
+    --color-text-primary-dark: #E8ECF0;
+    --color-text-primary-light: #1A2332;
+    --color-text-muted-dark: #8A9BB5;
+    --color-text-muted-light: #6B7C93;
+
+    /* Semantic */
+    --color-success: #4CAF50;
+    --color-warning: #FFD54F;
+    --color-error: #FF7043;
+    --color-info: #42A5F5;
+
+    /* Theme-adaptive surfaces (default to dark pond) */
+    --theme-bg-base: #1A2332;
+    --theme-bg-surface: #243447;
+    --theme-bg-card: #1f2c3d;
+    --theme-text-main: #E8ECF0;
+    --theme-text-dim: #8A9BB5;
+    --theme-border-subtle: rgba(36, 52, 71, 0.8);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --theme-bg-base: #F5F7FA;
+      --theme-bg-surface: #FFFFFF;
+      --theme-bg-card: #FFFFFF;
+      --theme-text-main: #1A2332;
+      --theme-text-dim: #6B7C93;
+      --theme-border-subtle: rgba(226, 232, 240, 0.9);
+    }
+  }
+
+  .dark {
+    --theme-bg-base: #1A2332;
+    --theme-bg-surface: #243447;
+    --theme-bg-card: #1f2c3d;
+    --theme-text-main: #E8ECF0;
+    --theme-text-dim: #8A9BB5;
+    --theme-border-subtle: rgba(36, 52, 71, 0.8);
+  }
+
+  .light {
+    --theme-bg-base: #F5F7FA;
+    --theme-bg-surface: #FFFFFF;
+    --theme-bg-card: #FFFFFF;
+    --theme-text-main: #1A2332;
+    --theme-text-dim: #6B7C93;
+    --theme-border-subtle: rgba(226, 232, 240, 0.9);
+  }
+}
+
+@layer utilities {
+  /* Touch target utility (Apple HIG & Material 44x44 minimum) */
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Safe Area Notch & Home Indicator Utilities */
+  .safe-pt {
+    padding-top: env(safe-area-inset-top, 44px);
+  }
+  .safe-pb {
+    padding-bottom: env(safe-area-inset-bottom, 34px);
+  }
+  .safe-pl {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .safe-pr {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  .safe-m {
+    margin-top: env(safe-area-inset-top, 44px);
+    margin-bottom: env(safe-area-inset-bottom, 34px);
+  }
+
+  /* Status Bar Spacing */
+  .status-bar-offset {
+    padding-top: 44px;
+  }
+}

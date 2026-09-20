@@ -155,3 +155,5 @@ export interface ColorToken {
   hex: string;
   description: string;
 }
+
+export * from './theme';

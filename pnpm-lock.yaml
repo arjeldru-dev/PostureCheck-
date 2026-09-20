@@ -390,6 +390,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.116.0
         version: 2.116.0
+      zustand:
+        specifier: ^5.0.3
+        version: 5.0.15(@types/react@19.3.0)(react@19.3.0)
     devDependencies:
       typescript:
         specifier: ^5.7.3

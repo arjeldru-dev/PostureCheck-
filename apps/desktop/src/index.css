@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme {
+  /* Core PostureCheck Brand Palette */
   --color-frog-green: #4CAF50;
   --color-frog-green-secondary: #66BB6A;
   --color-lily-pad: #81C784;
@@ -9,20 +10,105 @@
   --color-golden-xp: #FFD54F;
   --color-coral-alert: #FF7043;
   --color-sky-blue: #42A5F5;
+
+  /* Surfaces */
   --color-surface-dark: #243447;
   --color-surface-light: #FFFFFF;
   --color-surface-card: #1f2c3d;
+
+  /* Typography Colors */
   --color-text-primary-dark: #E8ECF0;
   --color-text-primary-light: #1A2332;
   --color-text-muted-dark: #8A9BB5;
   --color-text-muted-light: #6B7C93;
 
+  /* Semantic Color Aliases */
+  --color-success: #4CAF50;
+  --color-warning: #FFD54F;
+  --color-error: #FF7043;
+  --color-info: #42A5F5;
+
+  /* Dynamic Adaptive Theme Tokens */
+  --color-theme-bg: var(--theme-bg-base);
+  --color-theme-surface: var(--theme-bg-surface);
+  --color-theme-card: var(--theme-bg-card);
+  --color-theme-border: var(--theme-border-subtle);
+  --color-theme-text: var(--theme-text-main);
+  --color-theme-muted: var(--theme-text-dim);
+
+  /* Typography */
   --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
+  /* Font Sizes */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+  --text-5xl: 3rem;
+  --text-5xl--line-height: 1.15;
+
+  /* Spacing Scale */
+  --spacing-0_5: 0.125rem;
+  --spacing-1: 0.25rem;
+  --spacing-1_5: 0.375rem;
+  --spacing-2: 0.5rem;
+  --spacing-2_5: 0.625rem;
+  --spacing-3: 0.75rem;
+  --spacing-3_5: 0.875rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-7: 1.75rem;
+  --spacing-8: 2rem;
+  --spacing-9: 2.25rem;
+  --spacing-10: 2.5rem;
+  --spacing-11: 2.75rem;
+  --spacing-12: 3rem;
+  --spacing-14: 3.5rem;
+  --spacing-16: 4rem;
+  --spacing-20: 5rem;
+  --spacing-24: 6rem;
+
+  /* Border Radii */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.35), 0 4px 6px -4px rgba(0, 0, 0, 0.35);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.45);
+  --shadow-glow-green: 0 0 16px rgba(76, 175, 80, 0.35);
+  --shadow-glow-gold: 0 0 16px rgba(255, 213, 79, 0.45);
+
+  /* Animation Tokens */
   --animate-breathe: breathe 3.5s ease-in-out infinite;
   --animate-pulse-gold: pulseGold 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-fade-in: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-slide-up: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-slide-down: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-scale-in: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-bounce: bounce 1s infinite;
+  --animate-confetti: confettiFall 2.5s ease-out infinite;
 
   @keyframes breathe {
     0%, 100% {
@@ -43,18 +129,95 @@
       filter: drop-shadow(0 0 14px rgba(255, 213, 79, 0.8));
     }
   }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes confettiFall {
+    0% {
+      transform: translateY(-10px) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(100px) rotate(360deg);
+      opacity: 0;
+    }
+  }
 }
 
-/* Custom scrollbars */
+/* Theme Variables for Dark / Light mode */
+:root,
+[data-theme="dark"],
+.dark {
+  --theme-bg-base: #1A2332;
+  --theme-bg-surface: #243447;
+  --theme-bg-card: #1f2c3d;
+  --theme-border-subtle: rgba(36, 52, 71, 0.8);
+  --theme-text-main: #E8ECF0;
+  --theme-text-dim: #8A9BB5;
+  color-scheme: dark;
+}
+
+[data-theme="light"],
+.light {
+  --theme-bg-base: #F5F7FA;
+  --theme-bg-surface: #FFFFFF;
+  --theme-bg-card: #FFFFFF;
+  --theme-border-subtle: rgba(226, 232, 240, 0.9);
+  --theme-text-main: #1A2332;
+  --theme-text-dim: #6B7C93;
+  color-scheme: light;
+}
+
+/* Custom pond scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #1A2332;
+  background: var(--theme-bg-base);
 }
 ::-webkit-scrollbar-thumb {
-  background: #243447;
+  background: var(--theme-bg-surface);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {

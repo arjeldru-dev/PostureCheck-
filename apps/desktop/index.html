@@ -1,19 +1,41 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark" class="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/frog.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Posture Check!</title>
-    <!-- Google Fonts: Outfit, Inter, JetBrains Mono -->
+    <!-- Google Fonts: Outfit (Display), Inter (Body), JetBrains Mono (Stats/Code) with display=swap -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
+    <!-- Anti-flicker script to apply saved theme before React hydration. Synchronized with STORAGE_KEY in packages/shared/src/stores/theme-store.ts -->
+    <script>
+      (function () {
+        try {
+          const stored = localStorage.getItem('posture-check-theme');
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const resolved = stored === 'light' ? 'light' : stored === 'dark' ? 'dark' : (prefersDark ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', resolved);
+          if (resolved === 'dark') {
+            document.documentElement.classList.add('dark');
+            document.documentElement.classList.remove('light');
+          } else {
+            document.documentElement.classList.add('light');
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {
+          // Fallback to dark if localStorage is restricted
+          document.documentElement.setAttribute('data-theme', 'dark');
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
-  <body class="bg-pond-dark text-text-primary-dark antialiased select-none font-sans overflow-hidden">
+  <body class="bg-theme-bg text-theme-text antialiased select-none font-sans overflow-hidden transition-colors duration-200">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

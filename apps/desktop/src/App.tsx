@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import {
   DEFAULT_INTERVAL_MINUTES,
   LEVEL_THRESHOLDS,
+  useThemeStore,
   type MascotState,
 } from '@posture-check/shared';
+import DesignSystem from './pages/DesignSystem';
 import {
   fetchAppState,
   sendTestNotification,
@@ -19,14 +21,18 @@ import {
   Clock,
   Flame,
   Laptop,
+  Moon,
   Pause,
   Play,
   RefreshCw,
   Shield,
+  Sun,
   Zap,
 } from 'lucide-react';
 
 export default function App() {
+  const { mode, setMode } = useThemeStore();
+  const [currentView, setCurrentView] = useState<'dashboard' | 'design-system'>('dashboard');
   const [appState, setAppState] = useState<AppStatePayload>({
     status: 'active',
     interval_minutes: DEFAULT_INTERVAL_MINUTES,
@@ -125,11 +131,15 @@ export default function App() {
     }
   };
 
+  if (currentView === 'design-system') {
+    return <DesignSystem onBack={() => setCurrentView('dashboard')} />;
+  }
+
   return (
-    <main className="min-h-screen bg-pond-dark text-text-primary-dark p-6 flex flex-col justify-between select-none">
+    <main className="min-h-screen bg-theme-bg text-theme-text p-6 flex flex-col justify-between select-none transition-colors duration-200">
       <div className="max-w-4xl w-full mx-auto space-y-6">
         {/* Top App Bar */}
-        <header className="flex items-center justify-between border-b border-surface-dark/80 pb-4">
+        <header className="flex items-center justify-between border-b border-theme-border pb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-frog-green/20 border border-frog-green/40 flex items-center justify-center text-2xl shadow-sm">
               🐸
@@ -143,13 +153,43 @@ export default function App() {
                   v0.1.0-alpha
                 </span>
               </div>
-              <p className="text-xs text-text-muted-dark font-sans">
+              <p className="text-xs text-theme-muted font-sans">
                 Tauri 2.0 Desktop Scaffolding • Desktop Client
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Design System Switcher */}
+            <button
+              onClick={() => setCurrentView('design-system')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-surface border border-theme-border text-theme-text hover:border-frog-green hover:text-frog-green transition-colors"
+              title="Open Design System & Token Catalog"
+            >
+              <span>🎨 Design Tokens</span>
+            </button>
+
+            {/* 3-Way Theme Toggle (dark -> light -> system) */}
+            <button
+              onClick={() => {
+                const nextMode = mode === 'dark' ? 'light' : mode === 'light' ? 'system' : 'dark';
+                setMode(nextMode);
+                showFeedback(`Theme set to ${nextMode} mode`);
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-theme-surface border border-theme-border text-theme-muted hover:text-theme-text transition-colors"
+              title={`Theme: ${mode} (click to cycle: dark → light → system)`}
+            >
+              {mode === 'dark' ? (
+                <Moon className="w-4 h-4 text-sky-blue" />
+              ) : mode === 'light' ? (
+                <Sun className="w-4 h-4 text-golden-xp" />
+              ) : (
+                <Laptop className="w-4 h-4 text-frog-green" />
+              )}
+              <span className="text-[11px] font-mono capitalize">{mode}</span>
+            </button>
+
+            {/* Tauri IPC Status */}
             <div
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium border ${
                 isTauri

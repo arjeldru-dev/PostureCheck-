@@ -5,6 +5,8 @@ import {
   XP_PER_ACKNOWLEDGE,
   XP_DAILY_COMPLETION_BONUS,
   DEFAULT_INTERVAL_MINUTES,
+  COLORS,
+  FONT_SIZES,
 } from '@posture-check/shared';
 
 export default function HomeScreen() {
@@ -57,7 +59,7 @@ export default function HomeScreen() {
         {/* Sync Status Card */}
         <View className="bg-surface-dark rounded-2xl p-5 border border-surface-card mb-5">
           <View className="flex-row items-center gap-3 mb-3">
-            <Ionicons name="desktop-outline" size={22} color="#4CAF50" />
+            <Ionicons name="desktop-outline" size={22} color={COLORS.frogGreen} />
             <Text className="text-text-primary-dark font-semibold text-base">
               Desktop Sync
             </Text>
@@ -67,14 +69,14 @@ export default function HomeScreen() {
             <Text className="text-frog-green font-semibold">
               {DEFAULT_INTERVAL_MINUTES} mins
             </Text>
-            .
+            . Design tokens loaded (base font: {FONT_SIZES.base}).
           </Text>
         </View>
 
         {/* Quick Action Button */}
         <TouchableOpacity
           activeOpacity={0.8}
-          className="bg-frog-green p-4 rounded-xl items-center flex-row justify-center gap-2"
+          className="bg-frog-green p-4 rounded-xl items-center flex-row justify-center gap-2 touch-target"
         >
           <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
           <Text className="text-white font-bold text-base">
