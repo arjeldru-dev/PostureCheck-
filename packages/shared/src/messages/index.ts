@@ -1,4 +1,4 @@
-import type { IntensityLevel, MascotMessage, MascotState, MascotTone } from '../types/index.js';
+import type { IntensityLevel, MascotMessage, MascotState, MascotTone } from '../types/index';
 
 export const RIBBIT_MESSAGES: readonly MascotMessage[] = [
   // --- Level 1: Whisper (Subtle, gentle, quiet) ---

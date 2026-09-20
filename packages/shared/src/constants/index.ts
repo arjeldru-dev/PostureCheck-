@@ -3,7 +3,7 @@ import type {
   IntensityConfig,
   IntensityLevel,
   LevelProgression,
-} from '../types/index.js';
+} from '../types/index';
 
 /**
  * Gamification & XP Rules

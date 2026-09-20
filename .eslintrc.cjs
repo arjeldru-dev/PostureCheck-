@@ -19,6 +19,14 @@ module.exports = {
     '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
   },
+  overrides: [
+    {
+      files: ['*.js', '*.cjs'],
+      rules: {
+        '@typescript-eslint/no-require-imports': 'off',
+      },
+    },
+  ],
   ignorePatterns: [
     'dist',
     'node_modules',

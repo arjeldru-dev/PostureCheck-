@@ -3,8 +3,8 @@ import {
   STREAK_ACKNOWLEDGMENT_THRESHOLD,
   XP_STREAK_BASE_MULTIPLIER,
   XP_STREAK_BONUS_CAP,
-} from '../constants/index.js';
-import type { LevelCalculationResult } from '../types/index.js';
+} from '../constants/index';
+import type { LevelCalculationResult } from '../types/index';
 
 /**
  * Calculates current level, title, XP in current level, and percentage to next level.

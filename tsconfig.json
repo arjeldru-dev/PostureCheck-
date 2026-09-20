@@ -18,6 +18,7 @@
   "references": [
     { "path": "./packages/shared" },
     { "path": "./packages/ui" },
-    { "path": "./apps/desktop" }
+    { "path": "./apps/desktop" },
+    { "path": "./apps/mobile" }
   ]
 }
