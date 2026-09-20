@@ -18,6 +18,8 @@
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
     "@posture-check/shared": "workspace:*",
+    "@react-native-async-storage/async-storage": "^3.1.1",
+    "@supabase/supabase-js": "^2.116.0",
     "expo": "~57.0.24",
     "expo-constants": "~57.0.19",
     "expo-linking": "~57.0.10",

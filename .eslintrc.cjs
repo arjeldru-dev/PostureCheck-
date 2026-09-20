@@ -36,5 +36,6 @@ module.exports = {
     'android',
     'ios',
     'src-tauri/target',
+    'supabase',
   ],
 };

@@ -1,0 +1,2 @@
+-- Posture Check! - Seed Data Placeholder
+-- Seed data for development and testing will be populated in Phase 4.
