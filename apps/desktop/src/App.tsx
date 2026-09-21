@@ -6,6 +6,7 @@ import {
   type MascotState,
 } from '@posture-check/shared';
 import DesignSystem from './pages/DesignSystem';
+import RibbitMascot from '@/components/ribbit/RibbitMascot';
 import {
   fetchAppState,
   sendTestNotification,
@@ -236,8 +237,8 @@ export default function App() {
           <div className="flex flex-col md:flex-row items-center gap-6 relative z-10">
             {/* Mascot Avatar with breathing animation */}
             <div className="relative group">
-              <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-frog-green/30 to-lily-pad/10 border-2 border-frog-green/50 flex items-center justify-center text-5xl shadow-lg shadow-frog-green/10 animate-breathe">
-                {mascotState === 'sleeping' ? '😴' : mascotState === 'celebrating' ? '🎉' : '🐸'}
+              <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-frog-green/30 to-lily-pad/10 border-2 border-frog-green/50 flex items-center justify-center p-2 shadow-lg shadow-frog-green/10">
+                <RibbitMascot state={mascotState} size="md" />
               </div>
               <span className="absolute -bottom-2 -right-2 px-2 py-0.5 rounded-md bg-golden-xp text-pond-dark font-mono text-[10px] font-bold shadow">
                 LVL 1

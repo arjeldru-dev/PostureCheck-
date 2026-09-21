@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%" fill="none">
+  <!-- Ribbit: Idle State (Sitting on Lily Pad, Happy & Serene) -->
+  <defs>
+    <radialGradient id="waterRipples" cx="50%" cy="50%" r="50%">
+      <stop offset="60%" stop-color="#42A5F5" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#42A5F5" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="lilyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#388E3C" />
+      <stop offset="100%" stop-color="#1B5E20" />
+    </linearGradient>
+    <linearGradient id="bodyGrad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#66BB6A" />
+      <stop offset="40%" stop-color="#4CAF50" />
+      <stop offset="100%" stop-color="#388E3C" />
+    </linearGradient>
+    <linearGradient id="bellyGrad" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#A5D6A7" />
+      <stop offset="100%" stop-color="#81C784" />
+    </linearGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#1A2332" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Water Ripples -->
+  <ellipse cx="100" cy="172" rx="88" ry="18" fill="url(#waterRipples)" />
+  <ellipse cx="100" cy="172" rx="72" ry="14" stroke="#42A5F5" stroke-opacity="0.3" stroke-width="1.5" stroke-dasharray="8 6" />
+
+  <!-- Lily Pad -->
+  <path d="M 32 168 C 32 154 62 144 100 144 C 138 144 168 154 168 168 C 168 180 138 188 100 188 C 76 188 56 184 45 178 L 100 166 Z" fill="url(#lilyGrad)" />
+  <path d="M 100 166 L 168 168" stroke="#81C784" stroke-opacity="0.4" stroke-width="1.5" />
+  <path d="M 100 166 L 68 150" stroke="#81C784" stroke-opacity="0.3" stroke-width="1.5" />
+  <path d="M 100 166 L 132 150" stroke="#81C784" stroke-opacity="0.3" stroke-width="1.5" />
+
+  <!-- Frog Body Group with Shadow -->
+  <g filter="url(#softShadow)">
+    <!-- Back / Hind Feet -->
+    <ellipse cx="50" cy="162" rx="20" ry="10" fill="#388E3C" />
+    <ellipse cx="150" cy="162" rx="20" ry="10" fill="#388E3C" />
+    <!-- Webbed toes left -->
+    <circle cx="34" cy="164" r="5" fill="#4CAF50" />
+    <circle cx="44" cy="167" r="5.5" fill="#4CAF50" />
+    <circle cx="56" cy="167" r="5" fill="#4CAF50" />
+    <!-- Webbed toes right -->
+    <circle cx="144" cy="167" r="5" fill="#4CAF50" />
+    <circle cx="156" cy="167" r="5.5" fill="#4CAF50" />
+    <circle cx="166" cy="164" r="5" fill="#4CAF50" />
+
+    <!-- Main Chubby Body -->
+    <path d="M 52 120 C 44 86 64 64 100 64 C 136 64 156 86 148 120 C 146 145 132 165 100 165 C 68 165 54 145 52 120 Z" fill="url(#bodyGrad)" />
+
+    <!-- Eye Sockets (Bulges on top of head) -->
+    <circle cx="68" cy="62" r="24" fill="url(#bodyGrad)" />
+    <circle cx="132" cy="62" r="24" fill="url(#bodyGrad)" />
+
+    <!-- Light Belly -->
+    <path d="M 72 122 C 72 100 84 88 100 88 C 116 88 128 100 128 122 C 128 142 116 156 100 156 C 84 156 72 142 72 122 Z" fill="url(#bellyGrad)" />
+
+    <!-- Belly line contour -->
+    <path d="M 85 104 Q 100 100 115 104" stroke="#81C784" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.6" />
+
+    <!-- Front Hands resting on tummy -->
+    <path d="M 64 128 C 72 134 78 138 84 136" stroke="#388E3C" stroke-width="4" stroke-linecap="round" fill="none" />
+    <path d="M 136 128 C 128 134 122 138 116 136" stroke="#388E3C" stroke-width="4" stroke-linecap="round" fill="none" />
+    <circle cx="85" cy="136" r="3.5" fill="#66BB6A" />
+    <circle cx="115" cy="136" r="3.5" fill="#66BB6A" />
+
+    <!-- Eye Whites -->
+    <circle cx="68" cy="62" r="18" fill="#FFFFFF" />
+    <circle cx="132" cy="62" r="18" fill="#FFFFFF" />
+
+    <!-- Big Shiny Expressive Pupils (Pond Dark) -->
+    <ellipse cx="71" cy="63" rx="11" ry="12" fill="#1A2332" />
+    <ellipse cx="129" cy="63" rx="11" ry="12" fill="#1A2332" />
+
+    <!-- Eye Highlights (Catchlights) -->
+    <circle cx="75" cy="59" r="4" fill="#FFFFFF" />
+    <circle cx="67" cy="68" r="2" fill="#FFFFFF" />
+    <circle cx="133" cy="59" r="4" fill="#FFFFFF" />
+    <circle cx="125" cy="68" r="2" fill="#FFFFFF" />
+
+    <!-- Cute Cheeks (Rosy Blush) -->
+    <ellipse cx="56" cy="108" rx="8" ry="5" fill="#FF8A80" fill-opacity="0.45" />
+    <ellipse cx="144" cy="108" rx="8" ry="5" fill="#FF8A80" fill-opacity="0.45" />
+
+    <!-- Friendly Smile -->
+    <path d="M 88 108 Q 100 120 112 108" stroke="#1A2332" stroke-width="3.5" stroke-linecap="round" fill="none" />
+    <!-- Smile Dimples -->
+    <path d="M 86 107 Q 85 109 87 111" stroke="#1A2332" stroke-width="2" stroke-linecap="round" fill="none" />
+    <path d="M 114 107 Q 115 109 113 111" stroke="#1A2332" stroke-width="2" stroke-linecap="round" fill="none" />
+
+    <!-- Cute Nostrils -->
+    <circle cx="95" cy="94" r="1.5" fill="#2E7D32" />
+    <circle cx="105" cy="94" r="1.5" fill="#2E7D32" />
+  </g>
+</svg>

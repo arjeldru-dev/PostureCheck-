@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%" fill="none">
+  <!-- Ribbit: Reminding State (Alert, Upright Posture, Arm Raised Pointing to Chime) -->
+  <defs>
+    <linearGradient id="bodyGradRemind" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#66BB6A" />
+      <stop offset="40%" stop-color="#4CAF50" />
+      <stop offset="100%" stop-color="#388E3C" />
+    </linearGradient>
+    <linearGradient id="bellyGradRemind" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#A5D6A7" />
+      <stop offset="100%" stop-color="#81C784" />
+    </linearGradient>
+    <linearGradient id="goldChimeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE082" />
+      <stop offset="100%" stop-color="#FFB300" />
+    </linearGradient>
+    <filter id="softShadowRemind" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#1A2332" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Ground Shadow -->
+  <ellipse cx="100" cy="184" rx="48" ry="10" fill="#1A2332" fill-opacity="0.18" />
+
+  <!-- Reminder Alert Sparks / Soundwaves -->
+  <path d="M 152 42 Q 166 36 172 48" stroke="#FFD54F" stroke-width="3" stroke-linecap="round" fill="none" />
+  <path d="M 158 30 Q 176 24 182 40" stroke="#FFD54F" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="3 3" fill="none" />
+  <!-- Sparkle stars -->
+  <path d="M 166 22 L 168 28 L 174 30 L 168 32 L 166 38 L 164 32 L 158 30 L 164 28 Z" fill="#FFD54F" />
+
+  <!-- Alert Clock / Chime Bell Icon Floating near finger -->
+  <g transform="translate(142, 28) scale(0.9)">
+    <circle cx="16" cy="16" r="14" fill="url(#goldChimeGrad)" />
+    <circle cx="16" cy="16" r="11" fill="#FFFDE7" />
+    <!-- Clock hands pointing at reminder interval -->
+    <path d="M 16 9 L 16 16 L 20 18" stroke="#1A2332" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <circle cx="16" cy="16" r="2" fill="#1A2332" />
+  </g>
+
+  <!-- Main Body Group -->
+  <g filter="url(#softShadowRemind)">
+    <!-- Standing Feet (Tall & Grounded) -->
+    <ellipse cx="76" cy="178" rx="15" ry="8" fill="#388E3C" />
+    <ellipse cx="124" cy="178" rx="15" ry="8" fill="#388E3C" />
+    <circle cx="68" cy="180" r="4.5" fill="#4CAF50" />
+    <circle cx="76" cy="182" r="5" fill="#4CAF50" />
+    <circle cx="84" cy="180" r="4.5" fill="#4CAF50" />
+    <circle cx="116" cy="180" r="4.5" fill="#4CAF50" />
+    <circle cx="124" cy="182" r="5" fill="#4CAF50" />
+    <circle cx="132" cy="180" r="4.5" fill="#4CAF50" />
+
+    <!-- Left Arm placed firmly on hip -->
+    <path d="M 58 116 C 42 122 40 142 54 146" stroke="#388E3C" stroke-width="7" stroke-linecap="round" fill="none" />
+    <circle cx="56" cy="144" r="5" fill="#4CAF50" />
+
+    <!-- Tall Upright Body Silhouette -->
+    <path d="M 54 116 C 48 84 66 60 100 60 C 134 60 152 84 146 116 C 143 148 132 172 100 172 C 68 172 57 148 54 116 Z" fill="url(#bodyGradRemind)" />
+
+    <!-- Eye Sockets -->
+    <circle cx="70" cy="58" r="23" fill="url(#bodyGradRemind)" />
+    <circle cx="130" cy="58" r="23" fill="url(#bodyGradRemind)" />
+
+    <!-- Upright Tall Belly -->
+    <path d="M 74 116 C 74 94 86 82 100 82 C 114 82 126 94 126 116 C 126 146 114 162 100 162 C 86 162 74 146 74 116 Z" fill="url(#bellyGradRemind)" />
+
+    <!-- Right Arm raised pointing upward toward reminder -->
+    <path d="M 142 118 C 154 105 158 80 156 58" stroke="#388E3C" stroke-width="7" stroke-linecap="round" fill="none" />
+    <path d="M 142 118 C 154 105 158 80 156 58" stroke="#4CAF50" stroke-width="5" stroke-linecap="round" fill="none" />
+    <!-- Pointing hand -->
+    <circle cx="156" cy="55" r="5" fill="#66BB6A" />
+    <path d="M 156 55 L 156 46" stroke="#4CAF50" stroke-width="4.5" stroke-linecap="round" />
+
+    <!-- Eye Whites -->
+    <circle cx="70" cy="58" r="17" fill="#FFFFFF" />
+    <circle cx="130" cy="58" r="17" fill="#FFFFFF" />
+
+    <!-- Expressive Alert Pupils (Looking slightly up & forward) -->
+    <ellipse cx="73" cy="56" rx="10" ry="11" fill="#1A2332" />
+    <ellipse cx="133" cy="56" rx="10" ry="11" fill="#1A2332" />
+
+    <!-- Catchlights -->
+    <circle cx="76" cy="52" r="3.8" fill="#FFFFFF" />
+    <circle cx="70" cy="61" r="1.8" fill="#FFFFFF" />
+    <circle cx="136" cy="52" r="3.8" fill="#FFFFFF" />
+    <circle cx="130" cy="61" r="1.8" fill="#FFFFFF" />
+
+    <!-- Cheeks -->
+    <ellipse cx="58" cy="106" rx="7.5" ry="5" fill="#FF8A80" fill-opacity="0.45" />
+    <ellipse cx="142" cy="106" rx="7.5" ry="5" fill="#FF8A80" fill-opacity="0.45" />
+
+    <!-- Nostrils -->
+    <circle cx="96" cy="90" r="1.5" fill="#2E7D32" />
+    <circle cx="104" cy="90" r="1.5" fill="#2E7D32" />
+
+    <!-- Alert Friendly Speaking/Reminder Mouth -->
+    <ellipse cx="100" cy="107" rx="7" ry="5.5" fill="#1A2332" />
+    <path d="M 95 108 Q 100 112 105 108" fill="#FF8A80" />
+  </g>
+</svg>

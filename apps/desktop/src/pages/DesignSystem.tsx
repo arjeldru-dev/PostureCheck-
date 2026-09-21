@@ -6,7 +6,10 @@ import {
   SPACING,
   useThemeStore,
   type ThemeMode,
+  type RibbitState,
+  RIBBIT_STATE_DESCRIPTIONS,
 } from '@posture-check/shared';
+import RibbitMascot from '../components/ribbit/RibbitMascot';
 import {
   Check,
   Copy,
@@ -19,6 +22,7 @@ import {
   Layers,
   Activity,
   ArrowLeft,
+  Smile,
 } from 'lucide-react';
 
 interface DesignSystemProps {
@@ -119,7 +123,9 @@ function ColorCard({
 
 export default function DesignSystem({ onBack }: DesignSystemProps) {
   const { mode, resolvedMode, setMode } = useThemeStore();
-  const [activeTab, setActiveTab] = useState<'colors' | 'typography' | 'spacing' | 'surfaces' | 'animations'>('colors');
+  const [activeTab, setActiveTab] = useState<'colors' | 'typography' | 'spacing' | 'surfaces' | 'animations' | 'mascot'>('colors');
+  const [previewSize, setPreviewSize] = useState<'sm' | 'md' | 'lg' | 'xl'>('md');
+  const [previewBreathing, setPreviewBreathing] = useState(true);
 
   return (
     <div className="min-h-screen bg-theme-bg text-theme-text font-sans p-6 overflow-y-auto max-h-screen">
@@ -188,6 +194,7 @@ export default function DesignSystem({ onBack }: DesignSystemProps) {
               { id: 'spacing', label: 'Spacing Scale', icon: Maximize2 },
               { id: 'surfaces', label: 'Surfaces & Shadows', icon: Layers },
               { id: 'animations', label: 'Micro-Animations', icon: Activity },
+              { id: 'mascot', label: 'Ribbit Mascot', icon: Smile },
             ] as const
           ).map(({ id, label, icon: Icon }) => (
             <button
@@ -635,6 +642,92 @@ export default function DesignSystem({ onBack }: DesignSystemProps) {
                   <p className="text-xs text-theme-muted mt-0.5">Level 4 alert & celebratory jumping</p>
                 </div>
               </div>
+            </div>
+          </section>
+        )}
+        {/* 6. MASCOT TAB */}
+        {activeTab === 'mascot' && (
+          <section className="space-y-6 animate-fade-in">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-display font-bold text-theme-text mb-1">
+                  Ribbit the Frog Mascot Suite
+                </h2>
+                <p className="text-xs text-theme-muted">
+                  The visual personality of Posture Check! across 7 emotional states with GPU breathing motion.
+                </p>
+              </div>
+
+              {/* Controls */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1 bg-theme-surface p-1 rounded-xl border border-theme-border text-xs">
+                  {(['sm', 'md', 'lg', 'xl'] as const).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setPreviewSize(s)}
+                      className={`px-2.5 py-1 rounded-lg font-mono uppercase font-semibold transition-all ${
+                        previewSize === s
+                          ? 'bg-frog-green text-white shadow-xs'
+                          : 'text-theme-muted hover:text-theme-text'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setPreviewBreathing(!previewBreathing)}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                    previewBreathing
+                      ? 'bg-frog-green/15 border-frog-green/40 text-frog-green'
+                      : 'bg-theme-surface border-theme-border text-theme-muted'
+                  }`}
+                >
+                  {previewBreathing ? 'Breathing ON' : 'Breathing OFF'}
+                </button>
+              </div>
+            </div>
+
+            {/* 7 States Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {(
+                [
+                  'idle',
+                  'reminding',
+                  'encouraging',
+                  'celebrating',
+                  'concerned',
+                  'sleeping',
+                  'disappointed',
+                ] as RibbitState[]
+              ).map((state) => (
+                <div
+                  key={state}
+                  className="p-5 rounded-2xl bg-theme-surface border border-theme-border hover:border-frog-green/50 transition-all flex flex-col items-center text-center group"
+                >
+                  <div className="h-44 w-full flex items-center justify-center bg-theme-bg/60 rounded-xl mb-4 p-3 border border-theme-border/50">
+                    <RibbitMascot
+                      state={state}
+                      size={previewSize}
+                      showBreathing={previewBreathing}
+                    />
+                  </div>
+                  <div className="space-y-1 w-full">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="capitalize font-display font-bold text-sm text-theme-text">
+                        {state}
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-frog-green/15 text-frog-green font-mono font-medium">
+                        .svg
+                      </span>
+                    </div>
+                    <p className="text-xs text-theme-muted line-clamp-2">
+                      {RIBBIT_STATE_DESCRIPTIONS[state]}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </section>
         )}

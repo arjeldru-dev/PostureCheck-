@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%" fill="none">
+  <!-- Ribbit: Concerned State (Tilted Head, Worried Caring Eyes, Gentle Frown, Sweat Droplet) -->
+  <defs>
+    <linearGradient id="bodyGradConcern" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#66BB6A" />
+      <stop offset="40%" stop-color="#4CAF50" />
+      <stop offset="100%" stop-color="#388E3C" />
+    </linearGradient>
+    <linearGradient id="bellyGradConcern" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#A5D6A7" />
+      <stop offset="100%" stop-color="#81C784" />
+    </linearGradient>
+    <linearGradient id="dropletGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#90CAF9" />
+      <stop offset="100%" stop-color="#42A5F5" />
+    </linearGradient>
+    <filter id="softShadowConcern" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#1A2332" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Ground Shadow -->
+  <ellipse cx="98" cy="180" rx="46" ry="10" fill="#1A2332" fill-opacity="0.18" />
+
+  <!-- Empathy Tilt Group (-6 deg counter-clockwise) -->
+  <g transform="rotate(-6 100 120)" filter="url(#softShadowConcern)">
+    <!-- Blue Concern Sweat Droplet near right temple -->
+    <path d="M 152 46 C 152 46 160 56 160 62 C 160 66 156 70 152 70 C 148 70 144 66 144 62 C 144 56 152 46 152 46 Z" fill="url(#dropletGrad)" />
+    <circle cx="150" cy="62" r="1.5" fill="#FFFFFF" />
+
+    <!-- Feet -->
+    <ellipse cx="74" cy="174" rx="16" ry="9" fill="#388E3C" />
+    <ellipse cx="126" cy="174" rx="16" ry="9" fill="#388E3C" />
+    <circle cx="66" cy="176" r="4.8" fill="#4CAF50" />
+    <circle cx="75" cy="178" r="5.2" fill="#4CAF50" />
+    <circle cx="84" cy="176" r="4.8" fill="#4CAF50" />
+    <circle cx="116" cy="176" r="4.8" fill="#4CAF50" />
+    <circle cx="125" cy="178" r="5.2" fill="#4CAF50" />
+    <circle cx="134" cy="176" r="4.8" fill="#4CAF50" />
+
+    <!-- Chubby Body -->
+    <path d="M 52 118 C 44 86 64 62 100 62 C 136 62 156 86 148 118 C 145 146 132 168 100 168 C 68 168 55 146 52 118 Z" fill="url(#bodyGradConcern)" />
+
+    <!-- Eye Sockets -->
+    <circle cx="68" cy="60" r="24" fill="url(#bodyGradConcern)" />
+    <circle cx="132" cy="60" r="24" fill="url(#bodyGradConcern)" />
+
+    <!-- Light Belly -->
+    <path d="M 72 120 C 72 98 84 86 100 86 C 116 86 128 98 128 120 C 128 144 116 158 100 158 C 84 158 72 144 72 120 Z" fill="url(#bellyGradConcern)" />
+
+    <!-- Caring hands held near chest / heart -->
+    <path d="M 60 128 C 68 134 76 132 82 126" stroke="#388E3C" stroke-width="6" stroke-linecap="round" fill="none" />
+    <path d="M 140 128 C 132 134 124 132 118 126" stroke="#388E3C" stroke-width="6" stroke-linecap="round" fill="none" />
+    <circle cx="82" cy="126" r="4.5" fill="#66BB6A" />
+    <circle cx="118" cy="126" r="4.5" fill="#66BB6A" />
+
+    <!-- Eye Whites -->
+    <circle cx="68" cy="60" r="18" fill="#FFFFFF" />
+    <circle cx="132" cy="60" r="18" fill="#FFFFFF" />
+
+    <!-- Worried Eyebrows (Slanted down outwards) -->
+    <path d="M 54 44 Q 66 38 78 44" stroke="#2E7D32" stroke-width="3" stroke-linecap="round" fill="none" />
+    <path d="M 122 44 Q 134 38 146 44" stroke="#2E7D32" stroke-width="3" stroke-linecap="round" fill="none" />
+
+    <!-- Big Worried Looking Pupils (Shifted slightly upward & inward) -->
+    <ellipse cx="71" cy="60" rx="11" ry="12" fill="#1A2332" />
+    <ellipse cx="129" cy="60" rx="11" ry="12" fill="#1A2332" />
+
+    <!-- Slightly droopy upper eyelid folds -->
+    <path d="M 52 56 C 58 52 78 52 84 56" stroke="#4CAF50" stroke-width="3" stroke-linecap="round" fill="none" />
+    <path d="M 116 56 C 122 52 142 52 148 56" stroke="#4CAF50" stroke-width="3" stroke-linecap="round" fill="none" />
+
+    <!-- Catchlights (Liquid, expressive eyes) -->
+    <circle cx="74" cy="56" r="4.5" fill="#FFFFFF" />
+    <circle cx="66" cy="64" r="2.2" fill="#FFFFFF" />
+    <circle cx="132" cy="56" r="4.5" fill="#FFFFFF" />
+    <circle cx="124" cy="64" r="2.2" fill="#FFFFFF" />
+
+    <!-- Subtle Soft Blush -->
+    <ellipse cx="55" cy="108" rx="8" ry="5" fill="#FF8A80" fill-opacity="0.35" />
+    <ellipse cx="145" cy="108" rx="8" ry="5" fill="#FF8A80" fill-opacity="0.35" />
+
+    <!-- Nostrils -->
+    <circle cx="95" cy="94" r="1.5" fill="#2E7D32" />
+    <circle cx="105" cy="94" r="1.5" fill="#2E7D32" />
+
+    <!-- Gentle Wavy Concerned Frown -->
+    <path d="M 90 114 Q 96 109 101 112 Q 106 109 111 114" stroke="#1A2332" stroke-width="3.2" stroke-linecap="round" fill="none" />
+  </g>
+</svg>

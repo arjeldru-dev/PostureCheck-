@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%" fill="none">
+  <!-- Ribbit: Disappointed State (Slumped Posture, Droopy Sad Eyes, Downturned Mouth, Broken Streak) -->
+  <defs>
+    <linearGradient id="bodyGradDisappoint" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#5CAD60" />
+      <stop offset="40%" stop-color="#439A47" />
+      <stop offset="100%" stop-color="#2E7D32" />
+    </linearGradient>
+    <linearGradient id="bellyGradDisappoint" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#9CCC9D" />
+      <stop offset="100%" stop-color="#72B875" />
+    </linearGradient>
+    <filter id="softShadowDisappoint" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#1A2332" flood-opacity="0.22" />
+    </filter>
+  </defs>
+
+  <!-- Ground Shadow -->
+  <ellipse cx="100" cy="182" rx="46" ry="9" fill="#1A2332" fill-opacity="0.18" />
+
+  <!-- Broken Sparkle / Little Gloom Rain Lines above -->
+  <path d="M 82 28 L 80 36" stroke="#8A9BB5" stroke-width="2" stroke-linecap="round" opacity="0.6" />
+  <path d="M 100 22 L 98 32" stroke="#8A9BB5" stroke-width="2" stroke-linecap="round" opacity="0.6" />
+  <path d="M 118 28 L 116 36" stroke="#8A9BB5" stroke-width="2" stroke-linecap="round" opacity="0.6" />
+
+  <!-- Main Slumped Body Group -->
+  <g filter="url(#softShadowDisappoint)">
+    <!-- Slumped Feet -->
+    <ellipse cx="72" cy="176" rx="16" ry="8" fill="#2E7D32" />
+    <ellipse cx="128" cy="176" rx="16" ry="8" fill="#2E7D32" />
+    <circle cx="64" cy="177" r="4.5" fill="#439A47" />
+    <circle cx="73" cy="179" r="5" fill="#439A47" />
+    <circle cx="82" cy="177" r="4.5" fill="#439A47" />
+    <circle cx="118" cy="177" r="4.5" fill="#439A47" />
+    <circle cx="127" cy="179" r="5" fill="#439A47" />
+    <circle cx="136" cy="177" r="4.5" fill="#439A47" />
+
+    <!-- Limp Arms Hanging at Sides -->
+    <path d="M 52 118 C 42 128 44 148 50 156" stroke="#2E7D32" stroke-width="6.5" stroke-linecap="round" fill="none" />
+    <circle cx="50" cy="156" r="4.5" fill="#5CAD60" />
+    <path d="M 148 118 C 158 128 156 148 150 156" stroke="#2E7D32" stroke-width="6.5" stroke-linecap="round" fill="none" />
+    <circle cx="150" cy="156" r="4.5" fill="#5CAD60" />
+
+    <!-- Slumped Shoulders / Lowered Head Silhouette -->
+    <path d="M 50 124 C 44 94 62 72 100 72 C 138 72 156 94 150 124 C 147 150 132 170 100 170 C 68 170 53 150 50 124 Z" fill="url(#bodyGradDisappoint)" />
+
+    <!-- Eye Sockets (Slightly Lowered) -->
+    <circle cx="68" cy="70" r="23" fill="url(#bodyGradDisappoint)" />
+    <circle cx="132" cy="70" r="23" fill="url(#bodyGradDisappoint)" />
+
+    <!-- Belly -->
+    <path d="M 72 126 C 72 106 84 96 100 96 C 116 96 128 106 128 126 C 128 148 116 162 100 162 C 84 162 72 148 72 126 Z" fill="url(#bellyGradDisappoint)" />
+
+    <!-- Eye Whites -->
+    <circle cx="68" cy="70" r="17" fill="#FFFFFF" />
+    <circle cx="132" cy="70" r="17" fill="#FFFFFF" />
+
+    <!-- Sad Droopy Pupils (Looking Downwards) -->
+    <ellipse cx="68" cy="73" rx="10" ry="10" fill="#1A2332" />
+    <ellipse cx="132" cy="73" rx="10" ry="10" fill="#1A2332" />
+
+    <!-- Droopy Eyelids Covering Upper Eyes (Sad Slope) -->
+    <path d="M 50 64 Q 68 76 86 64 L 86 52 L 50 52 Z" fill="#439A47" />
+    <path d="M 50 64 Q 68 76 86 64" stroke="#2E7D32" stroke-width="3" stroke-linecap="round" fill="none" />
+    <path d="M 114 64 Q 132 76 150 64 L 150 52 L 114 52 Z" fill="#439A47" />
+    <path d="M 114 64 Q 132 76 150 64" stroke="#2E7D32" stroke-width="3" stroke-linecap="round" fill="none" />
+
+    <!-- Catchlights (Dimmer, Tearful) -->
+    <circle cx="66" cy="74" r="3.2" fill="#FFFFFF" />
+    <circle cx="130" cy="74" r="3.2" fill="#FFFFFF" />
+
+    <!-- Tiny Sad Tear Droplet -->
+    <ellipse cx="60" cy="85" rx="2.5" ry="4" fill="#90CAF9" opacity="0.8" />
+
+    <!-- Muted Cheeks -->
+    <ellipse cx="56" cy="116" rx="7.5" ry="4.5" fill="#FF8A80" fill-opacity="0.25" />
+    <ellipse cx="144" cy="116" rx="7.5" ry="4.5" fill="#FF8A80" fill-opacity="0.25" />
+
+    <!-- Nostrils -->
+    <circle cx="95" cy="102" r="1.5" fill="#1B5E20" />
+    <circle cx="105" cy="102" r="1.5" fill="#1B5E20" />
+
+    <!-- Downturned Sad Mouth (Frown) -->
+    <path d="M 90 120 Q 100 110 110 120" stroke="#1A2332" stroke-width="3.5" stroke-linecap="round" fill="none" />
+  </g>
+</svg>

@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%" fill="none">
+  <!-- Ribbit: Encouraging State (Cheerful Tilt, Big Smile, Thumbs Up) -->
+  <defs>
+    <linearGradient id="bodyGradEncourage" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#66BB6A" />
+      <stop offset="40%" stop-color="#4CAF50" />
+      <stop offset="100%" stop-color="#388E3C" />
+    </linearGradient>
+    <linearGradient id="bellyGradEncourage" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#A5D6A7" />
+      <stop offset="100%" stop-color="#81C784" />
+    </linearGradient>
+    <filter id="softShadowEncourage" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#1A2332" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Ground Shadow -->
+  <ellipse cx="102" cy="180" rx="46" ry="10" fill="#1A2332" fill-opacity="0.18" />
+
+  <!-- Encouraging Star Sparkles near Thumbs Up -->
+  <g transform="translate(156, 92)">
+    <path d="M 12 0 L 14 8 L 22 10 L 14 12 L 12 20 L 10 12 L 2 10 L 10 8 Z" fill="#FFD54F" />
+    <circle cx="22" cy="2" r="2.5" fill="#42A5F5" />
+    <circle cx="4" cy="20" r="2" fill="#FF7043" />
+  </g>
+
+  <!-- Character Group slightly tilted (5 deg clockwise) -->
+  <g transform="rotate(4 100 120)" filter="url(#softShadowEncourage)">
+    <!-- Feet -->
+    <ellipse cx="74" cy="174" rx="16" ry="9" fill="#388E3C" />
+    <ellipse cx="126" cy="174" rx="16" ry="9" fill="#388E3C" />
+    <circle cx="66" cy="176" r="4.8" fill="#4CAF50" />
+    <circle cx="75" cy="178" r="5.2" fill="#4CAF50" />
+    <circle cx="84" cy="176" r="4.8" fill="#4CAF50" />
+    <circle cx="116" cy="176" r="4.8" fill="#4CAF50" />
+    <circle cx="125" cy="178" r="5.2" fill="#4CAF50" />
+    <circle cx="134" cy="176" r="4.8" fill="#4CAF50" />
+
+    <!-- Left Hand Resting on Hip -->
+    <path d="M 56 122 C 42 128 42 144 56 148" stroke="#388E3C" stroke-width="7" stroke-linecap="round" fill="none" />
+    <circle cx="56" cy="146" r="5.5" fill="#4CAF50" />
+
+    <!-- Chubby Friendly Body -->
+    <path d="M 52 118 C 44 86 64 62 100 62 C 136 62 156 86 148 118 C 145 146 132 168 100 168 C 68 168 55 146 52 118 Z" fill="url(#bodyGradEncourage)" />
+
+    <!-- Eye Sockets -->
+    <circle cx="68" cy="60" r="24" fill="url(#bodyGradEncourage)" />
+    <circle cx="132" cy="60" r="24" fill="url(#bodyGradEncourage)" />
+
+    <!-- Belly -->
+    <path d="M 72 120 C 72 98 84 86 100 86 C 116 86 128 98 128 120 C 128 144 116 158 100 158 C 84 158 72 144 72 120 Z" fill="url(#bellyGradEncourage)" />
+
+    <!-- Right Arm with Thumbs Up 👍 -->
+    <path d="M 142 124 C 154 126 160 124 164 120" stroke="#388E3C" stroke-width="8" stroke-linecap="round" fill="none" />
+    <path d="M 142 124 C 154 126 160 124 164 120" stroke="#4CAF50" stroke-width="6" stroke-linecap="round" fill="none" />
+    <!-- Hand fist -->
+    <circle cx="164" cy="120" r="7" fill="#4CAF50" />
+    <!-- Thumb pointing high up -->
+    <path d="M 164 120 C 165 110 165 102 163 98 C 161 95 156 97 157 104 L 159 116" fill="#66BB6A" stroke="#388E3C" stroke-width="2" stroke-linejoin="round" />
+
+    <!-- Eye Whites -->
+    <circle cx="68" cy="60" r="18" fill="#FFFFFF" />
+    <circle cx="132" cy="60" r="18" fill="#FFFFFF" />
+
+    <!-- Big Happy Shining Pupils -->
+    <ellipse cx="71" cy="61" rx="11" ry="12" fill="#1A2332" />
+    <ellipse cx="129" cy="61" rx="11" ry="12" fill="#1A2332" />
+
+    <!-- Big Catchlights -->
+    <circle cx="75" cy="57" r="4.2" fill="#FFFFFF" />
+    <circle cx="66" cy="65" r="2" fill="#FFFFFF" />
+    <circle cx="133" cy="57" r="4.2" fill="#FFFFFF" />
+    <circle cx="124" cy="65" r="2" fill="#FFFFFF" />
+
+    <!-- Cheeks (Blushing Pink) -->
+    <ellipse cx="55" cy="108" rx="8.5" ry="5.5" fill="#FF8A80" fill-opacity="0.55" />
+    <ellipse cx="145" cy="108" rx="8.5" ry="5.5" fill="#FF8A80" fill-opacity="0.55" />
+
+    <!-- Nostrils -->
+    <circle cx="95" cy="93" r="1.5" fill="#2E7D32" />
+    <circle cx="105" cy="93" r="1.5" fill="#2E7D32" />
+
+    <!-- Big Bright Grin with Teeth/Open Mouth -->
+    <path d="M 84 105 C 84 105 90 124 100 124 C 110 124 116 105 116 105 Z" fill="#1A2332" />
+    <!-- Cute Pink Tongue -->
+    <path d="M 91 116 C 94 113 106 113 109 116 C 106 122 94 122 91 116 Z" fill="#FF8A80" />
+    <!-- Top Smile Line with Dimples -->
+    <path d="M 82 105 Q 100 109 118 105" stroke="#1A2332" stroke-width="3" stroke-linecap="round" fill="none" />
+  </g>
+</svg>

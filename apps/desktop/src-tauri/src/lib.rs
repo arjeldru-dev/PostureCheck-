@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -45,6 +45,38 @@ impl Default for AppState {
 const MIN_INTERVAL_MINUTES: u32 = 5;
 const MAX_INTERVAL_MINUTES: u32 = 120;
 
+const TRAY_ACTIVE_BYTES: &[u8] = include_bytes!("../icons/tray-active.png");
+const TRAY_PAUSED_BYTES: &[u8] = include_bytes!("../icons/tray-paused.png");
+
+static TRAY_ACTIVE_ICON: OnceLock<Option<tauri::image::Image<'static>>> = OnceLock::new();
+static TRAY_PAUSED_ICON: OnceLock<Option<tauri::image::Image<'static>>> = OnceLock::new();
+
+fn get_active_tray_icon() -> Option<tauri::image::Image<'static>> {
+    TRAY_ACTIVE_ICON
+        .get_or_init(|| tauri::image::Image::from_bytes(TRAY_ACTIVE_BYTES).ok())
+        .clone()
+}
+
+fn get_paused_tray_icon() -> Option<tauri::image::Image<'static>> {
+    TRAY_PAUSED_ICON
+        .get_or_init(|| tauri::image::Image::from_bytes(TRAY_PAUSED_BYTES).ok())
+        .clone()
+}
+
+fn update_tray_visuals(app: &tauri::AppHandle, is_paused: bool) {
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let (icon, tooltip) = if is_paused {
+            (get_paused_tray_icon(), "Posture Check! - Ribbit is snoozing (DND Mode) 😴")
+        } else {
+            (get_active_tray_icon(), "Posture Check! - Ribbit is guarding your posture 🐸")
+        };
+        if let Some(img) = icon {
+            let _ = tray.set_icon(Some(img));
+        }
+        let _ = tray.set_tooltip(Some(tooltip));
+    }
+}
+
 /// Command: Get current application state
 #[tauri::command]
 fn get_app_state(state: State<'_, Mutex<AppState>>) -> Result<AppStatePayload, String> {
@@ -85,8 +117,10 @@ fn toggle_pause(
     } else {
         "active".to_string()
     };
+    let is_paused = app_state.is_paused;
     let payload = app_state.to_payload();
     let _ = app.emit("app-state-changed", &payload);
+    update_tray_visuals(&app, is_paused);
     Ok(payload)
 }
 
@@ -124,15 +158,14 @@ pub fn run() {
             let quit_i = MenuItem::with_id(app, "quit", "Quit Posture Check!", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_i, &toggle_pause_i, &quit_i])?;
 
-            let tray_icon = app
-                .default_window_icon()
-                .cloned()
+            let active_tray_icon = get_active_tray_icon()
+                .or_else(|| app.default_window_icon().cloned())
                 .ok_or_else(|| "Failed to load default window icon".to_string())?;
 
-            let _tray = TrayIconBuilder::new()
-                .icon(tray_icon)
+            let _tray = TrayIconBuilder::with_id("main-tray")
+                .icon(active_tray_icon)
                 .menu(&menu)
-                .tooltip("Posture Check! - Ribbit is guarding your back 🐸")
+                .tooltip("Posture Check! - Ribbit is guarding your posture 🐸")
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {
@@ -150,8 +183,10 @@ pub fn run() {
                             } else {
                                 "active".to_string()
                             };
+                            let is_paused = s.is_paused;
                             let payload = s.to_payload();
                             let _ = app.emit("app-state-changed", &payload);
+                            update_tray_visuals(app, is_paused);
                         }
                     }
                     "quit" => {
