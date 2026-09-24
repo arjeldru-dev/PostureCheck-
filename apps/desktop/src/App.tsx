@@ -1,20 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  DEFAULT_INTERVAL_MINUTES,
   LEVEL_THRESHOLDS,
   useThemeStore,
   type MascotState,
 } from '@posture-check/shared';
 import DesignSystem from './pages/DesignSystem';
 import RibbitMascot from '@/components/ribbit/RibbitMascot';
+import { useTrayState } from '@/hooks/useTrayState';
 import {
-  fetchAppState,
   sendTestNotification,
-  subscribeToAppState,
-  togglePauseState,
-  updateTimerInterval,
   isTauriEnvironment,
-  type AppStatePayload,
 } from '@/lib/tauri';
 import {
   Bell,
@@ -34,14 +29,6 @@ import {
 export default function App() {
   const { mode, setMode } = useThemeStore();
   const [currentView, setCurrentView] = useState<'dashboard' | 'design-system'>('dashboard');
-  const [appState, setAppState] = useState<AppStatePayload>({
-    status: 'active',
-    interval_minutes: DEFAULT_INTERVAL_MINUTES,
-    is_paused: false,
-  });
-  const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [mascotState, setMascotState] = useState<MascotState>('idle');
   const [feedback, setFeedback] = useState<{ text: string; isError?: boolean } | null>(null);
   const isTauri = isTauriEnvironment();
 
@@ -52,58 +39,58 @@ export default function App() {
     }, 3500);
   };
 
-  const loadState = async () => {
-    try {
-      setLoading(true);
-      const state = await fetchAppState();
-      setAppState(state);
-      setLastUpdated(new Date());
-      setMascotState(state.is_paused ? 'sleeping' : 'encouraging');
-    } catch (err) {
-      console.error('Failed to load Tauri app state:', err);
-      showFeedback('Could not fetch app state from Rust backend', true);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    isActive,
+    isDnd,
+    nextReminderAt,
+    dndUntil,
+    intervalMinutes,
+    status,
+    loading,
+    error,
+    togglePause,
+    setDnd,
+    cancelDnd,
+    setIntervalMinutes,
+    syncWithBackend,
+  } = useTrayState({
+    onNavigate: (dest) => {
+      if (dest === 'settings') {
+        showFeedback('System Tray: Opened settings');
+      } else {
+        showFeedback('System Tray: Opened dashboard');
+      }
+    },
+    onStateChange: (state) => {
+      if (state.isDnd) {
+        showFeedback('System Tray: Do Not Disturb activated 🔕');
+      } else if (!state.isActive) {
+        showFeedback('System Tray: Reminders paused ⏸');
+      } else {
+        showFeedback('System Tray: Reminders resumed ▶');
+      }
+    },
+  });
+
+  const [mascotState, setMascotState] = useState<MascotState>('idle');
 
   useEffect(() => {
-    loadState();
+    if (isDnd || !isActive) {
+      setMascotState('sleeping');
+    } else {
+      setMascotState('encouraging');
+    }
+  }, [isActive, isDnd]);
 
-    // Subscribe to realtime backend state broadcasts (e.g. system tray toggles)
-    let unlistenFn: (() => void) | undefined;
-    subscribeToAppState((updatedState) => {
-      setAppState(updatedState);
-      setLastUpdated(new Date());
-      setMascotState(updatedState.is_paused ? 'sleeping' : 'encouraging');
-      showFeedback(
-        `State synced: Reminders ${updatedState.is_paused ? 'paused (DND)' : 'resumed'}`
-      );
-    })
-      .then((cleanup) => {
-        unlistenFn = cleanup;
-      })
-      .catch((err) => {
-        console.error('Failed to register app-state listener:', err);
-      });
-
-    return () => {
-      if (unlistenFn) {
-        unlistenFn();
-      }
-    };
-  }, []);
+  useEffect(() => {
+    if (error) {
+      showFeedback(error, true);
+    }
+  }, [error]);
 
   const handleTogglePause = async () => {
     try {
-      const updated = await togglePauseState();
-      setAppState(updated);
-      setMascotState(updated.is_paused ? 'sleeping' : 'celebrating');
-      showFeedback(
-        updated.is_paused
-          ? 'Reminders paused (DND mode active)'
-          : 'Reminders resumed! Ribbit is ready'
-      );
+      await togglePause();
     } catch (err) {
       console.error('Failed to toggle pause:', err);
       showFeedback('Failed to toggle pause state', true);
@@ -112,12 +99,30 @@ export default function App() {
 
   const handleIntervalChange = async (minutes: number) => {
     try {
-      await updateTimerInterval(minutes);
-      setAppState((prev) => ({ ...prev, interval_minutes: minutes }));
+      await setIntervalMinutes(minutes);
       showFeedback(`Reminder interval set to ${minutes} minutes`);
     } catch (err) {
       console.error('Failed to update interval:', err);
       showFeedback(err instanceof Error ? err.message : 'Failed to update interval', true);
+    }
+  };
+
+  const handleSetDnd = async (minutes: number | null) => {
+    try {
+      if (minutes === 0) {
+        await cancelDnd();
+        showFeedback('DND Mode disabled — Reminders active');
+      } else {
+        await setDnd(minutes);
+        showFeedback(
+          minutes
+            ? `Do Not Disturb set for ${minutes >= 60 ? `${minutes / 60}h` : `${minutes}m`}`
+            : 'Do Not Disturb active until manually turned off'
+        );
+      }
+    } catch (err) {
+      console.error('Failed to update DND mode:', err);
+      showFeedback('Failed to update DND mode', true);
     }
   };
 
@@ -129,6 +134,16 @@ export default function App() {
     } catch (err) {
       console.error('Failed to send test notification:', err);
       showFeedback('Failed to send notification: permission denied or unsupported', true);
+    }
+  };
+
+  const formatReminderTime = (isoString: string | null) => {
+    if (!isoString) return null;
+    try {
+      const dt = new Date(isoString);
+      return dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    } catch {
+      return null;
     }
   };
 
@@ -155,7 +170,7 @@ export default function App() {
                 </span>
               </div>
               <p className="text-xs text-theme-muted font-sans">
-                Tauri 2.0 Desktop Scaffolding • Desktop Client
+                Tauri 2.0 System Tray App • Phase 01 Core
               </p>
             </div>
           </div>
@@ -203,7 +218,7 @@ export default function App() {
                   isTauri ? 'bg-frog-green animate-pulse' : 'bg-sky-blue'
                 }`}
               />
-              {isTauri ? 'Tauri IPC Connected' : 'Browser Webview Mode'}
+              {isTauri ? 'Tauri Tray Active' : 'Browser Webview Mode'}
             </div>
           </div>
         </header>
@@ -256,8 +271,8 @@ export default function App() {
                 </div>
               </div>
               <p className="text-sm text-text-muted-dark max-w-xl">
-                Ribbit is ready to coach you to better spinal health. Desktop reminders run silently
-                in your system tray and will notify you when it is time to sit up tall and stretch.
+                Ribbit is running in your system tray. Closing this window hides it back to the tray
+                so reminders continue smoothly in the background.
               </p>
 
               {/* Progress bar preview */}
@@ -277,18 +292,18 @@ export default function App() {
           </div>
         </section>
 
-        {/* Live Rust Backend Control Grid */}
+        {/* Live System Tray State & Controls */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Rust IPC Status Card */}
+          {/* Rust Tray Backend State Card */}
           <div className="bg-surface-dark/50 border border-surface-dark rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-display font-semibold text-sm text-frog-green">
                 <Laptop className="w-4 h-4" />
-                <span>Rust Backend State (IPC)</span>
+                <span>System Tray Status & State</span>
               </div>
               <button
                 type="button"
-                onClick={loadState}
+                onClick={() => syncWithBackend()}
                 disabled={loading}
                 aria-label="Refresh app state from Rust backend"
                 className="p-1.5 rounded-lg hover:bg-surface-dark text-text-muted-dark hover:text-text-primary-dark transition-colors active:scale-95 focus-visible:ring-2 focus-visible:ring-frog-green outline-none"
@@ -300,39 +315,66 @@ export default function App() {
 
             <div className="grid grid-cols-2 gap-3 font-mono text-xs">
               <div className="p-3 rounded-lg bg-pond-dark/60 border border-surface-dark">
-                <div className="text-text-muted-dark text-[11px] mb-1">STATUS</div>
+                <div className="text-text-muted-dark text-[11px] mb-1">MODE</div>
                 <div className="flex items-center gap-1.5 font-bold">
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      appState.status === 'active' ? 'bg-frog-green' : 'bg-coral-alert'
+                      isDnd
+                        ? 'bg-purple-400'
+                        : isActive
+                        ? 'bg-frog-green'
+                        : 'bg-coral-alert'
                     }`}
                   />
                   <span
                     className={
-                      appState.status === 'active' ? 'text-frog-green' : 'text-coral-alert'
+                      isDnd
+                        ? 'text-purple-400'
+                        : isActive
+                        ? 'text-frog-green'
+                        : 'text-coral-alert'
                     }
                   >
-                    {appState.status.toUpperCase()}
+                    {status.toUpperCase()}
                   </span>
                 </div>
               </div>
 
               <div className="p-3 rounded-lg bg-pond-dark/60 border border-surface-dark">
-                <div className="text-text-muted-dark text-[11px] mb-1">INTERVAL</div>
+                <div className="text-text-muted-dark text-[11px] mb-1">NEXT REMINDER</div>
                 <div className="flex items-center gap-1.5 font-bold text-sky-blue">
                   <Clock className="w-3.5 h-3.5" />
-                  <span>{appState.interval_minutes} MIN</span>
+                  <span>
+                    {isDnd
+                      ? 'DND SILENT'
+                      : !isActive
+                      ? 'PAUSED'
+                      : formatReminderTime(nextReminderAt) ?? `${intervalMinutes}m`}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Diagnostic IPC Payload */}
+            {/* Diagnostic Tray Payload */}
             <div className="rounded-lg bg-pond-dark p-3 border border-surface-dark font-mono text-[11px] text-text-muted-dark overflow-x-auto">
               <div className="text-[10px] uppercase text-text-muted-dark/70 mb-1 flex items-center justify-between">
-                <span>invoke('get_app_state') Payload</span>
-                <span>{lastUpdated.toLocaleTimeString()}</span>
+                <span>Tray State Store</span>
+                <span>{new Date().toLocaleTimeString()}</span>
               </div>
-              <pre className="text-lily-pad/90">{JSON.stringify(appState, null, 2)}</pre>
+              <pre className="text-lily-pad/90">
+                {JSON.stringify(
+                  {
+                    isActive,
+                    isDnd,
+                    status,
+                    nextReminderAt,
+                    dndUntil,
+                    intervalMinutes,
+                  },
+                  null,
+                  2
+                )}
+              </pre>
             </div>
           </div>
 
@@ -341,16 +383,14 @@ export default function App() {
             <div>
               <div className="flex items-center gap-2 font-display font-semibold text-sm text-sky-blue mb-4">
                 <Zap className="w-4 h-4" />
-                <span>Timer & Reminder Controls</span>
+                <span>Timer & Tray Controls</span>
               </div>
 
               {/* Interval Buttons */}
               <div className="space-y-2 mb-4">
                 <label className="text-xs text-text-muted-dark font-medium flex items-center justify-between">
-                  <span>Preset Interval</span>
-                  <span className="font-mono text-frog-green">
-                    {appState.interval_minutes} minutes
-                  </span>
+                  <span>Reminder Interval</span>
+                  <span className="font-mono text-frog-green">{intervalMinutes} minutes</span>
                 </label>
                 <div className="grid grid-cols-4 gap-2">
                   {[15, 30, 45, 60].map((mins) => (
@@ -360,7 +400,7 @@ export default function App() {
                       onClick={() => handleIntervalChange(mins)}
                       aria-label={`Set reminder interval to ${mins} minutes`}
                       className={`py-2 px-3 rounded-lg text-xs font-mono font-semibold transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-frog-green outline-none border ${
-                        appState.interval_minutes === mins
+                        intervalMinutes === mins
                           ? 'bg-frog-green text-pond-dark border-frog-green shadow-sm'
                           : 'bg-surface-dark/80 text-text-muted-dark hover:text-text-primary-dark hover:bg-surface-dark border-transparent'
                       }`}
@@ -370,6 +410,52 @@ export default function App() {
                   ))}
                 </div>
               </div>
+
+              {/* Do Not Disturb Quick Presets */}
+              <div className="space-y-2 mb-4">
+                <label className="text-xs text-text-muted-dark font-medium flex items-center justify-between">
+                  <span>🔕 Do Not Disturb Mode</span>
+                  {isDnd && (
+                    <span className="text-[11px] font-mono text-purple-400">
+                      {dndUntil ? `Until ${formatReminderTime(dndUntil)}` : 'Indefinite'}
+                    </span>
+                  )}
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSetDnd(30)}
+                    className="py-1.5 px-2 rounded-lg text-xs font-mono bg-surface-dark/80 hover:bg-surface-dark text-text-muted-dark hover:text-purple-300 border border-surface-dark"
+                  >
+                    30m
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetDnd(60)}
+                    className="py-1.5 px-2 rounded-lg text-xs font-mono bg-surface-dark/80 hover:bg-surface-dark text-text-muted-dark hover:text-purple-300 border border-surface-dark"
+                  >
+                    1h
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetDnd(120)}
+                    className="py-1.5 px-2 rounded-lg text-xs font-mono bg-surface-dark/80 hover:bg-surface-dark text-text-muted-dark hover:text-purple-300 border border-surface-dark"
+                  >
+                    2h
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => (isDnd ? handleSetDnd(0) : handleSetDnd(null))}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-mono border ${
+                      isDnd
+                        ? 'bg-purple-600/30 text-purple-300 border-purple-500'
+                        : 'bg-surface-dark/80 hover:bg-surface-dark text-text-muted-dark hover:text-text-primary-dark border-surface-dark'
+                    }`}
+                  >
+                    {isDnd ? 'Off' : 'Hold'}
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Actions: Pause / Resume & Test Notification */}
@@ -377,16 +463,14 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleTogglePause}
-                aria-label={
-                  appState.is_paused ? 'Resume posture reminders' : 'Pause posture reminders'
-                }
+                aria-label={!isActive ? 'Resume posture reminders' : 'Pause posture reminders'}
                 className={`w-full py-3 px-4 rounded-xl font-display font-semibold text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-frog-green outline-none ${
-                  appState.is_paused
+                  !isActive
                     ? 'bg-frog-green hover:bg-frog-green-secondary text-pond-dark shadow-frog-green/20'
                     : 'bg-coral-alert hover:opacity-90 text-white shadow-coral-alert/20'
                 }`}
               >
-                {appState.is_paused ? (
+                {!isActive ? (
                   <>
                     <Play className="w-4 h-4 fill-current" />
                     <span>Resume Reminders</span>
@@ -394,7 +478,7 @@ export default function App() {
                 ) : (
                   <>
                     <Pause className="w-4 h-4 fill-current" />
-                    <span>Pause Reminders (DND)</span>
+                    <span>Pause Reminders</span>
                   </>
                 )}
               </button>
@@ -435,10 +519,10 @@ export default function App() {
               <CheckCircle2 className="w-4 h-4 text-frog-green shrink-0 mt-0.5" />
               <div>
                 <span className="font-semibold text-text-primary-dark block">
-                  Tailwind CSS 4 Tokens
+                  Tauri 2.0 System Tray
                 </span>
                 <span className="text-[11px] text-text-muted-dark">
-                  Frog Green, Pond Dark & Outfit fonts
+                  Icon state, context menu & DND submenus
                 </span>
               </div>
             </div>
@@ -447,20 +531,34 @@ export default function App() {
               <CheckCircle2 className="w-4 h-4 text-frog-green shrink-0 mt-0.5" />
               <div>
                 <span className="font-semibold text-text-primary-dark block">
-                  Tauri 2.0 System Tray
+                  Hide-to-Tray Lifecycle
                 </span>
                 <span className="text-[11px] text-text-muted-dark">
-                  Minimize-to-tray & Realtime IPC sync
+                  Close button (X) preserves background execution
                 </span>
               </div>
             </div>
           </div>
         </section>
+
+        {/* Windows 11 Tray Pinning Notice */}
+        <div className="bg-surface-dark/20 border border-surface-dark/50 rounded-xl p-3 text-xs text-text-muted-dark flex items-start gap-2.5">
+          <span className="text-base leading-none mt-0.5">💡</span>
+          <div>
+            <span className="font-semibold text-text-primary-dark">Windows 11 Tip: </span>
+            <span>
+              If Ribbit is hidden in the taskbar chevron (^), right-click your taskbar →{' '}
+              <span className="text-lily-pad font-medium">Taskbar settings</span> →{' '}
+              <span className="text-lily-pad font-medium">Other system tray icons</span> → toggle{' '}
+              <span className="text-frog-green font-semibold">Posture Check!</span> On to pin Ribbit to the visible tray.
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Bottom Footer */}
       <footer className="text-center text-[11px] text-text-muted-dark pt-6 font-mono border-t border-surface-dark/40 mt-6 flex items-center justify-between max-w-4xl mx-auto w-full">
-        <span>Posture Check! • Phase 00 Scaffolding</span>
+        <span>Posture Check! • Phase 01 System Tray Core</span>
         <div className="flex items-center gap-2">
           <span className="inline-block w-2 h-2 rounded-full bg-frog-green" />
           <span>System Healthy</span>

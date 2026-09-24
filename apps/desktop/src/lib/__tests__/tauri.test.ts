@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   fetchAppState,
+  getTrayState,
   isTauriEnvironment,
-  subscribeToAppState,
-  togglePauseState,
+  subscribeToTrayState,
+  togglePause,
   updateTimerInterval,
+  setDnd,
+  cancelDnd,
 } from '../tauri';
 
 describe('Tauri Frontend IPC Wrapper (Browser Mode)', () => {
@@ -17,6 +20,14 @@ describe('Tauri Frontend IPC Wrapper (Browser Mode)', () => {
     expect(state).toBeDefined();
     expect(typeof state.interval_minutes).toBe('number');
     expect(['active', 'paused', 'dnd']).toContain(state.status);
+  });
+
+  it('fetches tray state with camelCase fields', async () => {
+    const trayState = await getTrayState();
+    expect(trayState).toBeDefined();
+    expect(typeof trayState.isActive).toBe('boolean');
+    expect(typeof trayState.isDnd).toBe('boolean');
+    expect(typeof trayState.intervalMinutes).toBe('number');
   });
 
   it('enforces bounds on timer interval updates', async () => {
@@ -39,21 +50,33 @@ describe('Tauri Frontend IPC Wrapper (Browser Mode)', () => {
     expect(updated.interval_minutes).toBe(45);
   });
 
-  it('toggles pause state correctly', async () => {
-    const initial = await fetchAppState();
-    const toggled = await togglePauseState();
+  it('toggles pause state correctly with togglePause', async () => {
+    const initial = await getTrayState();
+    const toggled = await togglePause();
 
-    expect(toggled.is_paused).toBe(!initial.is_paused);
-    expect(toggled.status).toBe(toggled.is_paused ? 'paused' : 'active');
+    expect(toggled.isActive).toBe(!initial.isActive);
+    expect(toggled.status).toBe(toggled.isActive ? 'active' : 'paused');
 
     // Toggle back
-    const restored = await togglePauseState();
-    expect(restored.is_paused).toBe(initial.is_paused);
+    const restored = await togglePause();
+    expect(restored.isActive).toBe(initial.isActive);
   });
 
-  it('returns clean unlisten function when subscribing to app state in web mode', async () => {
+  it('handles setDnd and cancelDnd in mock mode', async () => {
+    const dndState = await setDnd(30);
+    expect(dndState.isDnd).toBe(true);
+    expect(dndState.status).toBe('dnd');
+    expect(dndState.dndUntil).not.toBeNull();
+
+    const normalState = await cancelDnd();
+    expect(normalState.isDnd).toBe(false);
+    expect(normalState.isActive).toBe(true);
+    expect(normalState.status).toBe('active');
+  });
+
+  it('returns clean unlisten function when subscribing to tray state in web mode', async () => {
     const callback = () => {};
-    const unlisten = await subscribeToAppState(callback);
+    const unlisten = await subscribeToTrayState(callback);
     expect(typeof unlisten).toBe('function');
     expect(() => unlisten()).not.toThrow();
   });

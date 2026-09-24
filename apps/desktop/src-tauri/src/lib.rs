@@ -1,87 +1,93 @@
-use std::sync::{Mutex, OnceLock};
-use tauri::{
-    menu::{Menu, MenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Emitter, Manager, State, WindowEvent,
+pub mod state;
+pub mod tray;
+
+use std::sync::Mutex;
+use tauri::{Emitter, Manager, State, WindowEvent};
+
+use state::{
+    AppState, AppStatePayload, TrayStatePayload, MAX_INTERVAL_MINUTES, MIN_INTERVAL_MINUTES,
 };
+use tray::update_tray_visuals;
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct AppStatePayload {
-    pub status: String,
-    pub interval_minutes: u32,
-    pub is_paused: bool,
+/// Command: Get current system tray state (isActive, isDnd, nextReminderAt, etc.)
+#[tauri::command]
+fn get_tray_state(state: State<'_, Mutex<AppState>>) -> Result<TrayStatePayload, String> {
+    let app_state = state.lock().map_err(|e| e.to_string())?;
+    Ok(app_state.to_tray_payload())
 }
 
-pub struct AppState {
-    pub status: String,
-    pub interval_minutes: u32,
-    pub is_paused: bool,
-}
-
-impl AppState {
-    pub fn new() -> Self {
-        Self {
-            status: "active".to_string(),
-            interval_minutes: 30,
-            is_paused: false,
-        }
-    }
-
-    pub fn to_payload(&self) -> AppStatePayload {
-        AppStatePayload {
-            status: self.status.clone(),
-            interval_minutes: self.interval_minutes,
-            is_paused: self.is_paused,
-        }
-    }
-}
-
-impl Default for AppState {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-const MIN_INTERVAL_MINUTES: u32 = 5;
-const MAX_INTERVAL_MINUTES: u32 = 120;
-
-const TRAY_ACTIVE_BYTES: &[u8] = include_bytes!("../icons/tray-active.png");
-const TRAY_PAUSED_BYTES: &[u8] = include_bytes!("../icons/tray-paused.png");
-
-static TRAY_ACTIVE_ICON: OnceLock<Option<tauri::image::Image<'static>>> = OnceLock::new();
-static TRAY_PAUSED_ICON: OnceLock<Option<tauri::image::Image<'static>>> = OnceLock::new();
-
-fn get_active_tray_icon() -> Option<tauri::image::Image<'static>> {
-    TRAY_ACTIVE_ICON
-        .get_or_init(|| tauri::image::Image::from_bytes(TRAY_ACTIVE_BYTES).ok())
-        .clone()
-}
-
-fn get_paused_tray_icon() -> Option<tauri::image::Image<'static>> {
-    TRAY_PAUSED_ICON
-        .get_or_init(|| tauri::image::Image::from_bytes(TRAY_PAUSED_BYTES).ok())
-        .clone()
-}
-
-fn update_tray_visuals(app: &tauri::AppHandle, is_paused: bool) {
-    if let Some(tray) = app.tray_by_id("main-tray") {
-        let (icon, tooltip) = if is_paused {
-            (get_paused_tray_icon(), "Posture Check! - Ribbit is snoozing (DND Mode) 😴")
+/// Command: Toggle pause/resume state of posture reminders
+#[tauri::command]
+fn toggle_pause(
+    app: tauri::AppHandle,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<TrayStatePayload, String> {
+    let (tray_payload, app_payload) = {
+        let mut app_state = state.lock().map_err(|e| e.to_string())?;
+        if app_state.is_dnd_active() {
+            app_state.cancel_dnd();
         } else {
-            (get_active_tray_icon(), "Posture Check! - Ribbit is guarding your posture 🐸")
-        };
-        if let Some(img) = icon {
-            let _ = tray.set_icon(Some(img));
+            app_state.toggle_pause();
         }
-        let _ = tray.set_tooltip(Some(tooltip));
-    }
+        (app_state.to_tray_payload(), app_state.to_app_payload())
+    };
+
+    let _ = app.emit("tray-state-changed", &tray_payload);
+    let _ = app.emit("app-state-changed", &app_payload);
+
+    update_tray_visuals(&app);
+    Ok(tray_payload)
 }
 
-/// Command: Get current application state
+/// Command: Set Do Not Disturb mode with optional duration in minutes
+#[tauri::command]
+fn set_dnd(
+    duration_minutes: Option<u64>,
+    app: tauri::AppHandle,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<TrayStatePayload, String> {
+    let (tray_payload, app_payload) = {
+        let mut app_state = state.lock().map_err(|e| e.to_string())?;
+        app_state.set_dnd(duration_minutes);
+        (app_state.to_tray_payload(), app_state.to_app_payload())
+    };
+
+    let _ = app.emit("tray-state-changed", &tray_payload);
+    let _ = app.emit("app-state-changed", &app_payload);
+
+    update_tray_visuals(&app);
+
+    if let Some(minutes) = duration_minutes {
+        tray::spawn_dnd_revert_timer(&app, minutes);
+    }
+
+    Ok(tray_payload)
+}
+
+/// Command: Cancel Do Not Disturb mode
+#[tauri::command]
+fn cancel_dnd(
+    app: tauri::AppHandle,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<TrayStatePayload, String> {
+    let (tray_payload, app_payload) = {
+        let mut app_state = state.lock().map_err(|e| e.to_string())?;
+        app_state.cancel_dnd();
+        (app_state.to_tray_payload(), app_state.to_app_payload())
+    };
+
+    let _ = app.emit("tray-state-changed", &tray_payload);
+    let _ = app.emit("app-state-changed", &app_payload);
+
+    update_tray_visuals(&app);
+    Ok(tray_payload)
+}
+
+/// Command: Get legacy app state payload
 #[tauri::command]
 fn get_app_state(state: State<'_, Mutex<AppState>>) -> Result<AppStatePayload, String> {
     let app_state = state.lock().map_err(|e| e.to_string())?;
-    Ok(app_state.to_payload())
+    Ok(app_state.to_app_payload())
 }
 
 /// Command: Set timer interval in minutes (enforces 5-120 min bounds)
@@ -97,31 +103,18 @@ fn set_timer_interval(
             MIN_INTERVAL_MINUTES, MAX_INTERVAL_MINUTES
         ));
     }
-    let mut app_state = state.lock().map_err(|e| e.to_string())?;
-    app_state.interval_minutes = interval;
-    let payload = app_state.to_payload();
-    let _ = app.emit("app-state-changed", &payload);
-    Ok(())
-}
-
-/// Command: Toggle pause/resume state
-#[tauri::command]
-fn toggle_pause(
-    app: tauri::AppHandle,
-    state: State<'_, Mutex<AppState>>,
-) -> Result<AppStatePayload, String> {
-    let mut app_state = state.lock().map_err(|e| e.to_string())?;
-    app_state.is_paused = !app_state.is_paused;
-    app_state.status = if app_state.is_paused {
-        "paused".to_string()
-    } else {
-        "active".to_string()
+    let (tray_payload, app_payload) = {
+        let mut app_state = state.lock().map_err(|e| e.to_string())?;
+        app_state.interval_minutes = interval;
+        app_state.refresh_next_reminder();
+        (app_state.to_tray_payload(), app_state.to_app_payload())
     };
-    let is_paused = app_state.is_paused;
-    let payload = app_state.to_payload();
-    let _ = app.emit("app-state-changed", &payload);
-    update_tray_visuals(&app, is_paused);
-    Ok(payload)
+
+    let _ = app.emit("tray-state-changed", &tray_payload);
+    let _ = app.emit("app-state-changed", &app_payload);
+
+    update_tray_visuals(&app);
+    Ok(())
 }
 
 /// Command: Send a native test notification to verify OS capabilities
@@ -146,82 +139,21 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Mutex::new(AppState::new()))
         .invoke_handler(tauri::generate_handler![
+            get_tray_state,
+            toggle_pause,
+            set_dnd,
+            cancel_dnd,
             get_app_state,
             set_timer_interval,
-            toggle_pause,
             send_test_notification
         ])
         .setup(|app| {
-            // Setup System Tray Menu
-            let show_i = MenuItem::with_id(app, "show", "Show Posture Check!", true, None::<&str>)?;
-            let toggle_pause_i = MenuItem::with_id(app, "toggle_pause", "Pause / Resume Reminders", true, None::<&str>)?;
-            let quit_i = MenuItem::with_id(app, "quit", "Quit Posture Check!", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &toggle_pause_i, &quit_i])?;
+            // Setup System Tray
+            tray::create_tray(app.handle())?;
 
-            let active_tray_icon = get_active_tray_icon()
-                .or_else(|| app.default_window_icon().cloned())
-                .ok_or_else(|| "Failed to load default window icon".to_string())?;
-
-            let _tray = TrayIconBuilder::with_id("main-tray")
-                .icon(active_tray_icon)
-                .menu(&menu)
-                .tooltip("Posture Check! - Ribbit is guarding your posture 🐸")
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    }
-                    "toggle_pause" => {
-                        let state = app.state::<Mutex<AppState>>();
-                        let lock_result = state.lock();
-                        if let Ok(mut s) = lock_result {
-                            s.is_paused = !s.is_paused;
-                            s.status = if s.is_paused {
-                                "paused".to_string()
-                            } else {
-                                "active".to_string()
-                            };
-                            let is_paused = s.is_paused;
-                            let payload = s.to_payload();
-                            let _ = app.emit("app-state-changed", &payload);
-                            update_tray_visuals(app, is_paused);
-                        }
-                    }
-                    "quit" => {
-                        app.exit(0);
-                    }
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let is_visible = window.is_visible().unwrap_or(false);
-                            if is_visible {
-                                let _ = window.hide();
-                            } else {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                        }
-                    }
-                })
-                .build(app)?;
-
-            // In dev mode, show window automatically on startup so developers can immediately see the UI
-            #[cfg(debug_assertions)]
-            {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
+            // If main window exists, center it
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.center();
             }
 
             Ok(())
