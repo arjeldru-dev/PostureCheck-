@@ -7,6 +7,7 @@ use tauri::{
 };
 
 use crate::state::AppState;
+use crate::timer::TimerNotifier;
 
 pub const TRAY_ID: &str = "main-tray";
 
@@ -64,16 +65,14 @@ pub fn update_tray_visuals(app: &AppHandle) {
 
     let tooltip = if is_dnd {
         if let Some(until) = dnd_until {
-            let local_until = until.with_timezone(&chrono::Local);
-            format!("Posture Check! — DND until {}", local_until.format("%-I:%M %p"))
+            format!("Posture Check! — DND until {}", until.format("%-I:%M %p"))
         } else {
             "Posture Check! — Do Not Disturb (Silent)".to_string()
         }
     } else if is_paused {
         "Posture Check! — Reminders Paused 😴".to_string()
     } else if let Some(next) = next_reminder {
-        let local_next = next.with_timezone(&chrono::Local);
-        format!("Posture Check! — Next reminder at {}", local_next.format("%-I:%M %p"))
+        format!("Posture Check! — Next reminder at {}", next.format("%-I:%M %p"))
     } else {
         "Posture Check! — Ribbit is guarding your posture 🐸".to_string()
     };
@@ -152,6 +151,7 @@ pub fn create_tray(app: &AppHandle) -> Result<TrayIcon, Box<dyn std::error::Erro
             match event_id {
                 "toggle_pause" => {
                     let mut tray_payload = None;
+                    let mut timer_payload = None;
                     let mut app_payload = None;
                     {
                         let state = app.state::<Mutex<AppState>>();
@@ -162,12 +162,17 @@ pub fn create_tray(app: &AppHandle) -> Result<TrayIcon, Box<dyn std::error::Erro
                                 s.toggle_pause();
                             }
                             tray_payload = Some(s.to_tray_payload());
+                            timer_payload = Some(s.to_timer_payload());
                             app_payload = Some(s.to_app_payload());
                         };
                     }
-                    if let (Some(tp), Some(ap)) = (tray_payload, app_payload) {
+                    if let (Some(tp), Some(ap), Some(tmp)) = (tray_payload, app_payload, timer_payload) {
                         let _ = app.emit("app-state-changed", &ap);
                         let _ = app.emit("tray-state-changed", &tp);
+                        let _ = app.emit("timer-state-changed", &tmp);
+                    }
+                    if let Some(notifier) = app.try_state::<TimerNotifier>() {
+                        notifier.0.notify_one();
                     }
                     update_tray_visuals(app);
                 }
@@ -185,18 +190,24 @@ pub fn create_tray(app: &AppHandle) -> Result<TrayIcon, Box<dyn std::error::Erro
                 }
                 "dnd_cancel" => {
                     let mut tray_payload = None;
+                    let mut timer_payload = None;
                     let mut app_payload = None;
                     {
                         let state = app.state::<Mutex<AppState>>();
                         if let Ok(mut s) = state.lock() {
                             s.cancel_dnd();
                             tray_payload = Some(s.to_tray_payload());
+                            timer_payload = Some(s.to_timer_payload());
                             app_payload = Some(s.to_app_payload());
                         };
                     }
-                    if let (Some(tp), Some(ap)) = (tray_payload, app_payload) {
+                    if let (Some(tp), Some(ap), Some(tmp)) = (tray_payload, app_payload, timer_payload) {
                         let _ = app.emit("app-state-changed", &ap);
                         let _ = app.emit("tray-state-changed", &tp);
+                        let _ = app.emit("timer-state-changed", &tmp);
+                    }
+                    if let Some(notifier) = app.try_state::<TimerNotifier>() {
+                        notifier.0.notify_one();
                     }
                     update_tray_visuals(app);
                 }
@@ -253,19 +264,26 @@ pub fn toggle_main_window(app: &AppHandle) {
 
 pub fn handle_set_dnd(app: &AppHandle, duration_minutes: Option<u64>) {
     let mut tray_payload = None;
+    let mut timer_payload = None;
     let mut app_payload = None;
     {
         let state = app.state::<Mutex<AppState>>();
         if let Ok(mut s) = state.lock() {
             s.set_dnd(duration_minutes);
             tray_payload = Some(s.to_tray_payload());
+            timer_payload = Some(s.to_timer_payload());
             app_payload = Some(s.to_app_payload());
         };
     }
 
-    if let (Some(tp), Some(ap)) = (tray_payload, app_payload) {
+    if let (Some(tp), Some(ap), Some(tmp)) = (tray_payload, app_payload, timer_payload) {
         let _ = app.emit("app-state-changed", &ap);
         let _ = app.emit("tray-state-changed", &tp);
+        let _ = app.emit("timer-state-changed", &tmp);
+    }
+
+    if let Some(notifier) = app.try_state::<TimerNotifier>() {
+        notifier.0.notify_one();
     }
 
     update_tray_visuals(app);
@@ -281,6 +299,7 @@ pub fn spawn_dnd_revert_timer(app: &AppHandle, duration_minutes: u64) {
         tokio::time::sleep(tokio::time::Duration::from_secs(duration_minutes * 60)).await;
         let mut was_dnd = false;
         let mut app_payload = None;
+        let mut timer_payload = None;
         let mut tray_payload = None;
         {
             let state = app_clone.state::<Mutex<AppState>>();
@@ -290,6 +309,7 @@ pub fn spawn_dnd_revert_timer(app: &AppHandle, duration_minutes: u64) {
                     s.cancel_dnd();
                     was_dnd = true;
                     app_payload = Some(s.to_app_payload());
+                    timer_payload = Some(s.to_timer_payload());
                     tray_payload = Some(s.to_tray_payload());
                 }
             };
@@ -301,6 +321,12 @@ pub fn spawn_dnd_revert_timer(app: &AppHandle, duration_minutes: u64) {
             }
             if let Some(tp) = tray_payload {
                 let _ = app_clone.emit("tray-state-changed", &tp);
+            }
+            if let Some(tmp) = timer_payload {
+                let _ = app_clone.emit("timer-state-changed", &tmp);
+            }
+            if let Some(notifier) = app_clone.try_state::<TimerNotifier>() {
+                notifier.0.notify_one();
             }
             update_tray_visuals(&app_clone);
         }
