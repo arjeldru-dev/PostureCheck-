@@ -1,13 +1,18 @@
+pub mod database;
 pub mod notifications;
 pub mod state;
 pub mod timer;
 pub mod tray;
 
 use std::sync::{Arc, Mutex};
-use chrono::NaiveTime;
+use chrono::{DateTime, Local, NaiveTime, Weekday};
+use database::{
+    AchievementItem, Database, PersistedAppState, PostureCheck, PostureSettings,
+    SaveSettingsInput, TodayStats, UserProgress,
+};
 use notifications::{
-    acknowledge_active_notification, show_posture_notification, snooze_active_notification,
-    NotificationManager, NotificationRecord,
+    acknowledge_active_notification, show_posture_notification as core_show_posture_notification,
+    snooze_active_notification, NotificationManager, NotificationRecord,
 };
 use tauri::{Emitter, Manager, State, WindowEvent};
 use tokio::sync::Notify;
@@ -48,6 +53,17 @@ fn toggle_pause(
         )
     };
 
+    if let Some(db) = app.try_state::<Database>() {
+        let _ = db.save_app_state(&PersistedAppState {
+            id: 1,
+            is_paused: tray_payload.status == "paused",
+            is_dnd: tray_payload.is_dnd,
+            dnd_until: tray_payload.dnd_until.clone(),
+            theme_mode: "system".to_string(),
+            launch_on_startup: false,
+        });
+    }
+
     let _ = app.emit("tray-state-changed", &tray_payload);
     let _ = app.emit("timer-state-changed", &timer_payload);
     let _ = app.emit("app-state-changed", &app_payload);
@@ -76,6 +92,17 @@ fn set_dnd(
             app_state.to_app_payload(),
         )
     };
+
+    if let Some(db) = app.try_state::<Database>() {
+        let _ = db.save_app_state(&PersistedAppState {
+            id: 1,
+            is_paused: tray_payload.status == "paused",
+            is_dnd: tray_payload.is_dnd,
+            dnd_until: tray_payload.dnd_until.clone(),
+            theme_mode: "system".to_string(),
+            launch_on_startup: false,
+        });
+    }
 
     let _ = app.emit("tray-state-changed", &tray_payload);
     let _ = app.emit("timer-state-changed", &timer_payload);
@@ -109,6 +136,17 @@ fn cancel_dnd(
             app_state.to_app_payload(),
         )
     };
+
+    if let Some(db) = app.try_state::<Database>() {
+        let _ = db.save_app_state(&PersistedAppState {
+            id: 1,
+            is_paused: tray_payload.status == "paused",
+            is_dnd: tray_payload.is_dnd,
+            dnd_until: tray_payload.dnd_until.clone(),
+            theme_mode: "system".to_string(),
+            launch_on_startup: false,
+        });
+    }
 
     let _ = app.emit("tray-state-changed", &tray_payload);
     let _ = app.emit("timer-state-changed", &timer_payload);
@@ -354,6 +392,36 @@ fn get_notification_history(
     Ok(history)
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PostureNotificationPayload {
+    pub title: Option<String>,
+    pub body: Option<String>,
+    #[serde(alias = "intensity_level")]
+    pub intensity_level: Option<u8>,
+}
+
+/// Command: Display a posture check notification (supports object payload or level param)
+#[tauri::command]
+fn show_posture_notification(
+    notification: Option<PostureNotificationPayload>,
+    level: Option<u8>,
+    message: Option<String>,
+    app: tauri::AppHandle,
+) -> Result<NotificationRecord, String> {
+    let lvl = notification
+        .as_ref()
+        .and_then(|n| n.intensity_level)
+        .or(level)
+        .unwrap_or(2)
+        .clamp(1, 3);
+    let msg = notification
+        .as_ref()
+        .and_then(|n| n.body.clone())
+        .or(message);
+    core_show_posture_notification(&app, lvl, msg)
+}
+
 /// Command: Send a test notification at specified intensity level (1..=3)
 #[tauri::command]
 fn test_notification(
@@ -361,7 +429,7 @@ fn test_notification(
     app: tauri::AppHandle,
 ) -> Result<NotificationRecord, String> {
     let clamped_level = level.clamp(1, 3);
-    show_posture_notification(&app, clamped_level, None)
+    core_show_posture_notification(&app, clamped_level, None)
 }
 
 /// Command: Send a native test notification to verify OS capabilities
@@ -407,6 +475,9 @@ fn handle_notification_action(
         }
         "dismiss" => {
             if let Some(id) = &notification_id {
+                if let Some(db) = app.try_state::<Database>() {
+                    let _ = db.update_posture_check(id, "dismissed", None, None);
+                }
                 if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
                     if let Ok(mut lock) = mgr.lock() {
                         lock.update_status(id, "dismissed");
@@ -488,6 +559,112 @@ fn check_notification_permission(_app: tauri::AppHandle) -> Result<String, Strin
     Ok("granted".to_string())
 }
 
+/// Command: Get active posture settings from database
+#[tauri::command]
+fn get_settings(db: State<'_, Database>) -> Result<PostureSettings, String> {
+    db.get_settings()
+}
+
+/// Command: Save posture settings to database and sync timer state
+#[tauri::command]
+fn save_settings(
+    settings: SaveSettingsInput,
+    app: tauri::AppHandle,
+    state: State<'_, Mutex<AppState>>,
+    db: State<'_, Database>,
+) -> Result<PostureSettings, String> {
+    let saved = db.save_settings(settings)?;
+
+    let (tray_payload, timer_payload, app_payload) = {
+        let mut app_state = state.lock().map_err(|e| e.to_string())?;
+        app_state.timer.set_interval(saved.interval_minutes);
+        app_state.timer.escalation_enabled = saved.auto_escalation;
+
+        if let Ok(start) = NaiveTime::parse_from_str(&saved.active_hours_start, "%H:%M") {
+            if let Ok(end) = NaiveTime::parse_from_str(&saved.active_hours_end, "%H:%M") {
+                app_state.timer.set_active_hours(start, end);
+            }
+        }
+
+        let parsed_days: Vec<u8> = saved
+            .active_days
+            .split(',')
+            .filter_map(|s| s.trim().parse::<u8>().ok())
+            .collect();
+        if !parsed_days.is_empty() {
+            app_state.timer.set_active_days(parsed_days);
+        }
+
+        app_state.sync_from_timer();
+        (
+            app_state.to_tray_payload(),
+            app_state.to_timer_payload(),
+            app_state.to_app_payload(),
+        )
+    };
+
+    let _ = app.emit("settings-changed", &saved);
+    let _ = app.emit("tray-state-changed", &tray_payload);
+    let _ = app.emit("timer-state-changed", &timer_payload);
+    let _ = app.emit("app-state-changed", &app_payload);
+
+    if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
+        if let Ok(mut lock) = mgr.lock() {
+            lock.default_intensity_level = saved.intensity_level;
+        }
+    }
+
+    if let Some(notifier) = app.try_state::<TimerNotifier>() {
+        notifier.0.notify_one();
+    }
+
+    update_tray_visuals(&app);
+    Ok(saved)
+}
+
+/// Command: Get paginated posture check history from database
+#[tauri::command]
+fn get_posture_history(
+    limit: Option<u32>,
+    offset: Option<u32>,
+    db: State<'_, Database>,
+) -> Result<Vec<PostureCheck>, String> {
+    db.get_posture_checks(limit.unwrap_or(50), offset.unwrap_or(0))
+}
+
+/// Command: Get user gamification progress (XP, level, streak)
+#[tauri::command]
+fn get_progress(db: State<'_, Database>) -> Result<UserProgress, String> {
+    db.get_user_progress()
+}
+
+/// Command: Get all achievements with unlock status
+#[tauri::command]
+fn get_achievements(db: State<'_, Database>) -> Result<Vec<AchievementItem>, String> {
+    db.get_achievements()
+}
+
+/// Command: Get today's statistics
+#[tauri::command]
+fn get_today_stats(db: State<'_, Database>) -> Result<TodayStats, String> {
+    db.get_today_stats()
+}
+
+/// Command: Get persisted app state from database
+#[tauri::command]
+fn get_persisted_app_state(db: State<'_, Database>) -> Result<PersistedAppState, String> {
+    db.get_app_state()
+}
+
+/// Command: Save persisted app state to database
+#[tauri::command]
+fn save_app_state(
+    state: PersistedAppState,
+    db: State<'_, Database>,
+) -> Result<PersistedAppState, String> {
+    db.save_app_state(&state)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let notify = Arc::new(Notify::new());
@@ -517,9 +694,103 @@ pub fn run() {
             get_notification_history,
             test_notification,
             handle_notification_action,
-            check_notification_permission
+            check_notification_permission,
+            get_settings,
+            save_settings,
+            get_posture_history,
+            get_progress,
+            get_achievements,
+            get_today_stats,
+            get_persisted_app_state,
+            save_app_state,
+            show_posture_notification
         ])
         .setup(move |app| {
+            // 1. Initialize SQLite Database and run migrations
+            let db = database::init_database(app.handle())?;
+
+            // 2. Load settings and persisted app state to restore initial state
+            let settings = db.get_settings().unwrap_or_default();
+            let persisted_state = db.get_app_state().unwrap_or_default();
+
+            {
+                if let Ok(mut state) = app.state::<Mutex<AppState>>().lock() {
+                    state.interval_minutes = settings.interval_minutes;
+                    state.timer.interval_minutes = settings.interval_minutes;
+                    state.timer.escalation_enabled = settings.auto_escalation;
+
+                    if let Ok(start) = NaiveTime::parse_from_str(&settings.active_hours_start, "%H:%M") {
+                        state.timer.active_hours_start = start;
+                    }
+                    if let Ok(end) = NaiveTime::parse_from_str(&settings.active_hours_end, "%H:%M") {
+                        state.timer.active_hours_end = end;
+                    }
+
+                    let parsed_days: Vec<Weekday> = settings
+                        .active_days
+                        .split(',')
+                        .filter_map(|s| s.trim().parse::<u8>().ok())
+                        .filter_map(|num| match num {
+                            1 => Some(Weekday::Mon),
+                            2 => Some(Weekday::Tue),
+                            3 => Some(Weekday::Wed),
+                            4 => Some(Weekday::Thu),
+                            5 => Some(Weekday::Fri),
+                            6 => Some(Weekday::Sat),
+                            7 => Some(Weekday::Sun),
+                            _ => None,
+                        })
+                        .collect();
+                    if !parsed_days.is_empty() {
+                        state.timer.active_days = parsed_days;
+                    }
+
+                    if persisted_state.is_paused {
+                        state.is_paused = true;
+                        state.timer.is_running = false;
+                        state.next_reminder_at = None;
+                        state.timer.next_fire_at = None;
+                    } else if persisted_state.is_dnd {
+                        let mut still_dnd = true;
+                        if let Some(ref until_str) = persisted_state.dnd_until {
+                            if let Ok(until_dt) = DateTime::parse_from_rfc3339(until_str) {
+                                let until_local = until_dt.with_timezone(&Local);
+                                if Local::now() < until_local {
+                                    state.is_dnd = true;
+                                    state.dnd_until = Some(until_local);
+                                    state.timer.is_running = false;
+                                    state.next_reminder_at = None;
+                                    state.timer.next_fire_at = None;
+                                } else {
+                                    still_dnd = false;
+                                }
+                            }
+                        } else {
+                            state.is_dnd = true;
+                            state.dnd_until = None;
+                            state.timer.is_running = false;
+                            state.next_reminder_at = None;
+                            state.timer.next_fire_at = None;
+                        }
+
+                        if !still_dnd {
+                            state.cancel_dnd();
+                        }
+                    } else {
+                        state.refresh_next_reminder();
+                    }
+                }
+            }
+
+            if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
+                if let Ok(mut lock) = mgr.lock() {
+                    lock.default_intensity_level = settings.intensity_level;
+                }
+            }
+
+            // Manage database handle
+            app.manage(db);
+
             // Setup System Tray
             tray::create_tray(app.handle())?;
 

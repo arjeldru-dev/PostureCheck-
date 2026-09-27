@@ -327,8 +327,19 @@ pub fn show_posture_notification(
     level: u8,
     custom_message: Option<String>,
 ) -> Result<NotificationRecord, String> {
+    show_posture_notification_with_id(app, level, custom_message, None)
+}
+
+/// Displays a posture notification with an explicit check ID
+pub fn show_posture_notification_with_id(
+    app: &AppHandle,
+    level: u8,
+    custom_message: Option<String>,
+    check_id: Option<String>,
+) -> Result<NotificationRecord, String> {
     let now = Local::now();
-    let notification_id = format!("notif-{}", now.timestamp_millis());
+    let is_new_check = check_id.is_none();
+    let notification_id = check_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
     // 1. Pick non-repeating message
     let body = match custom_message {
@@ -464,7 +475,7 @@ pub fn show_posture_notification(
         }
     }
 
-    // 4. Record in notification history
+    // 4. Record in notification history and SQLite database
     let record = {
         if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
             if let Ok(mut lock) = mgr.lock() {
@@ -472,7 +483,7 @@ pub fn show_posture_notification(
                     notification_id.clone(),
                     level,
                     title.to_string(),
-                    body,
+                    body.clone(),
                     "shown".to_string(),
                 )
             } else {
@@ -481,7 +492,7 @@ pub fn show_posture_notification(
                     timestamp: now.to_rfc3339(),
                     level,
                     title: title.to_string(),
-                    body,
+                    body: body.clone(),
                     status: "shown".to_string(),
                     actions: vec![],
                 }
@@ -492,12 +503,24 @@ pub fn show_posture_notification(
                 timestamp: now.to_rfc3339(),
                 level,
                 title: title.to_string(),
-                body,
+                body: body.clone(),
                 status: "shown".to_string(),
                 actions: vec![],
             }
         }
     };
+
+    // Ensure check is logged in SQLite database only if not already logged upstream (e.g. from test notifications)
+    if is_new_check {
+        if let Some(db) = app.try_state::<crate::database::Database>() {
+            let _ = db.log_posture_check(crate::database::NewPostureCheck {
+                id: Some(notification_id.clone()),
+                fired_at: Some(chrono::Utc::now().to_rfc3339()),
+                intensity_level: level,
+                message_shown: Some(body),
+            });
+        }
+    }
 
     // 5. Emit `notification-shown` event to frontend
     let _ = app.emit("notification-shown", &record);
@@ -532,6 +555,10 @@ pub fn show_posture_notification(
             }
 
             if was_dismissed {
+                if let Some(db) = app_handle.try_state::<crate::database::Database>() {
+                    let _ = db.update_posture_check(&target_id, "dismissed", None, None);
+                }
+
                 let _ = app_handle.emit(
                     "notification-dismissed",
                     serde_json::json!({
@@ -560,6 +587,20 @@ pub fn acknowledge_active_notification(app: &AppHandle, xp_earned: u32) {
         }
     }
 
+    if let Some(db) = app.try_state::<crate::database::Database>() {
+        if let Ok((updated_progress, newly_unlocked)) =
+            db.process_check_acknowledgment(target_id.as_deref(), xp_earned)
+        {
+            let _ = app.emit("progress-updated", &updated_progress);
+            for ach_id in newly_unlocked {
+                let _ = app.emit(
+                    "achievement-unlocked",
+                    serde_json::json!({ "achievementId": ach_id }),
+                );
+            }
+        }
+    }
+
     let _ = app.emit(
         "notification-acknowledged",
         serde_json::json!({
@@ -578,6 +619,12 @@ pub fn snooze_active_notification(app: &AppHandle, minutes: u32) {
         }
     }
 
+    if let Some(ref id) = target_id {
+        if let Some(db) = app.try_state::<crate::database::Database>() {
+            let _ = db.update_posture_check(id, "snoozed", None, None);
+        }
+    }
+
     let _ = app.emit(
         "notification-snoozed",
         serde_json::json!({
@@ -593,6 +640,12 @@ pub fn expire_active_notification(app: &AppHandle) {
     if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
         if let Ok(mut lock) = mgr.lock() {
             target_id = lock.update_latest_active_status("expired");
+        }
+    }
+
+    if let Some(ref id) = target_id {
+        if let Some(db) = app.try_state::<crate::database::Database>() {
+            let _ = db.update_posture_check(id, "expired", None, None);
         }
     }
 

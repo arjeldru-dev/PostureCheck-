@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 // Register modules from desktop core lib
+pub use posture_check_desktop_lib::database;
 pub use posture_check_desktop_lib::notifications;
 pub use posture_check_desktop_lib::timer;
 

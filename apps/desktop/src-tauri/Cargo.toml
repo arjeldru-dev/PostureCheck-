@@ -22,6 +22,8 @@ chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1", features = ["time", "sync", "macros"] }
 rand = "0.9"
 notify-rust = "4"
+uuid = { version = "1", features = ["v4", "serde"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
 
 [target.'cfg(windows)'.dependencies]
 tauri-winrt-notification = "0.7"

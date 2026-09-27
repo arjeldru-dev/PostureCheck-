@@ -494,11 +494,22 @@ pub fn start_timer_engine(app: AppHandle, notify: Arc<Notify>) {
                 };
                 reminder.message = picked_msg.clone();
 
+                let check_id = uuid::Uuid::new_v4().to_string();
+                if let Some(db) = app.try_state::<crate::database::Database>() {
+                    let _ = db.log_posture_check(crate::database::NewPostureCheck {
+                        id: Some(check_id.clone()),
+                        fired_at: Some(chrono::Utc::now().to_rfc3339()),
+                        intensity_level: reminder.level,
+                        message_shown: Some(picked_msg.clone()),
+                    });
+                }
+
                 let _ = app.emit("posture-reminder", &reminder);
-                let _ = crate::notifications::show_posture_notification(
+                let _ = crate::notifications::show_posture_notification_with_id(
                     &app,
                     reminder.level,
                     Some(picked_msg),
+                    Some(check_id),
                 );
             }
 
