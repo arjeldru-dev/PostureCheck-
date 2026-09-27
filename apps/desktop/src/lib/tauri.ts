@@ -406,6 +406,11 @@ export async function sendTestNotification(): Promise<void> {
   }
 }
 
+export interface NotificationAction {
+  id: string;
+  label: string;
+}
+
 export interface NotificationRecord {
   id: string;
   timestamp: string;
@@ -413,6 +418,28 @@ export interface NotificationRecord {
   title: string;
   body: string;
   status: 'shown' | 'acknowledged' | 'snoozed' | 'dismissed' | 'expired';
+  actions?: NotificationAction[];
+}
+
+export interface NotificationAcknowledgedPayload {
+  id: string | null;
+  xpEarned: number;
+}
+
+export interface NotificationSnoozedPayload {
+  id: string | null;
+  minutes: number;
+}
+
+export interface NotificationDismissedPayload {
+  id: string | null;
+  reason: string;
+  level?: number;
+}
+
+export interface NotificationExpiredPayload {
+  id: string;
+  reason: string;
 }
 
 const mockNotificationHistory: NotificationRecord[] = [];
@@ -459,12 +486,54 @@ export async function testNotification(level: number): Promise<NotificationRecor
         : 'Posture Check! 🐸',
     body: 'Ribbit nudges: Time for a posture check! Straighten up and breathe deep.',
     status: 'shown',
+    actions: [
+      { id: 'sitting_up', label: '✓ Sitting up!' },
+      { id: 'snooze', label: '💤 Snooze (5m)' },
+    ],
   };
   mockNotificationHistory.push(notif);
   if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
     new Notification(notif.title, { body: notif.body });
   }
   return notif;
+}
+
+/**
+ * Handle action clicked on a notification (e.g. "sitting_up", "snooze", "dismiss")
+ */
+export async function handleNotificationAction(
+  action: 'sitting_up' | 'snooze' | 'dismiss' | string,
+  notificationId?: string
+): Promise<any> {
+  if (isTauriEnvironment()) {
+    return await invoke('handle_notification_action', { action, notificationId });
+  }
+  if (notificationId) {
+    const item = mockNotificationHistory.find((n) => n.id === notificationId);
+    if (item) {
+      if (action === 'sitting_up' || action === 'acknowledge') {
+        item.status = 'acknowledged';
+      } else if (action === 'snooze') {
+        item.status = 'snoozed';
+      } else if (action === 'dismiss') {
+        item.status = 'dismissed';
+      }
+    }
+  }
+  return { action, success: true, notificationId };
+}
+
+/**
+ * Check OS notification permissions
+ */
+export async function checkNotificationPermission(): Promise<'granted' | 'denied' | 'prompt' | 'unknown'> {
+  if (isTauriEnvironment()) {
+    return await invoke<'granted' | 'denied' | 'prompt' | 'unknown'>('check_notification_permission');
+  }
+  if (typeof window !== 'undefined' && 'Notification' in window) {
+    return Notification.permission as 'granted' | 'denied' | 'prompt';
+  }
+  return 'unknown';
 }
 
 /**
@@ -481,4 +550,65 @@ export async function subscribeToNotificationShown(
   }
   return () => {};
 }
+
+/**
+ * Subscribe to notification-acknowledged events from Rust backend
+ */
+export async function subscribeToNotificationAcknowledged(
+  callback: (payload: NotificationAcknowledgedPayload) => void
+): Promise<() => void> {
+  if (isTauriEnvironment()) {
+    const unlisten = await listen<NotificationAcknowledgedPayload>('notification-acknowledged', (event) => {
+      callback(event.payload);
+    });
+    return unlisten;
+  }
+  return () => {};
+}
+
+/**
+ * Subscribe to notification-snoozed events from Rust backend
+ */
+export async function subscribeToNotificationSnoozed(
+  callback: (payload: NotificationSnoozedPayload) => void
+): Promise<() => void> {
+  if (isTauriEnvironment()) {
+    const unlisten = await listen<NotificationSnoozedPayload>('notification-snoozed', (event) => {
+      callback(event.payload);
+    });
+    return unlisten;
+  }
+  return () => {};
+}
+
+/**
+ * Subscribe to notification-dismissed events from Rust backend
+ */
+export async function subscribeToNotificationDismissed(
+  callback: (payload: NotificationDismissedPayload) => void
+): Promise<() => void> {
+  if (isTauriEnvironment()) {
+    const unlisten = await listen<NotificationDismissedPayload>('notification-dismissed', (event) => {
+      callback(event.payload);
+    });
+    return unlisten;
+  }
+  return () => {};
+}
+
+/**
+ * Subscribe to notification-expired events from Rust backend
+ */
+export async function subscribeToNotificationExpired(
+  callback: (payload: NotificationExpiredPayload) => void
+): Promise<() => void> {
+  if (isTauriEnvironment()) {
+    const unlisten = await listen<NotificationExpiredPayload>('notification-expired', (event) => {
+      callback(event.payload);
+    });
+    return unlisten;
+  }
+  return () => {};
+}
+
 

@@ -460,13 +460,45 @@ pub fn start_timer_engine(app: AppHandle, notify: Arc<Notify>) {
                 }
             }
 
+            // Check for notification expiration if 2x interval passed without interaction
+            {
+                if let Ok(state) = app.state::<std::sync::Mutex<AppState>>().lock() {
+                    if let Some(prev_fired) = state.timer.last_fired_at {
+                        let unacknowledged = match state.timer.last_acknowledged_at {
+                            Some(ack) => ack < prev_fired,
+                            None => true,
+                        };
+                        if unacknowledged {
+                            let elapsed = now.signed_duration_since(prev_fired);
+                            let threshold = Duration::minutes((state.timer.interval_minutes * 2) as i64);
+                            if elapsed >= threshold {
+                                crate::notifications::expire_active_notification(&app);
+                            }
+                        }
+                    }
+                }
+            }
+
             // Emit reminder event and trigger native OS notification
-            if let Some(reminder) = reminder_event {
+            if let Some(mut reminder) = reminder_event {
+                let picked_msg = {
+                    if let Some(mgr) = app.try_state::<std::sync::Mutex<crate::notifications::NotificationManager>>() {
+                        if let Ok(mut lock) = mgr.lock() {
+                            lock.pick_message(reminder.level)
+                        } else {
+                            reminder.message.clone()
+                        }
+                    } else {
+                        reminder.message.clone()
+                    }
+                };
+                reminder.message = picked_msg.clone();
+
                 let _ = app.emit("posture-reminder", &reminder);
                 let _ = crate::notifications::show_posture_notification(
                     &app,
                     reminder.level,
-                    Some(reminder.message),
+                    Some(picked_msg),
                 );
             }
 

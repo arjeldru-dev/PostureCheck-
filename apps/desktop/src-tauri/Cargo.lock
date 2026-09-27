@@ -3071,6 +3071,8 @@ name = "posture-check-desktop"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "notify-rust",
+ "rand 0.9.5",
  "serde",
  "serde_json",
  "tauri",
@@ -3078,7 +3080,9 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-sql",
  "tauri-plugin-updater",
+ "tauri-winrt-notification",
  "tokio",
+ "windows",
  "windows-sys 0.59.0",
 ]
 

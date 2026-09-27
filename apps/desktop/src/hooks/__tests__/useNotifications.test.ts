@@ -19,5 +19,28 @@ describe('useNotifications Hook', () => {
     expect(typeof latestResult?.testNotification).toBe('function');
     expect(typeof latestResult?.setIntensityLevel).toBe('function');
     expect(typeof latestResult?.refreshHistory).toBe('function');
+    expect(typeof latestResult?.handleAction).toBe('function');
+    expect(typeof latestResult?.acknowledge).toBe('function');
+    expect(typeof latestResult?.snooze).toBe('function');
+    expect(typeof latestResult?.dismiss).toBe('function');
+    expect(typeof latestResult?.isPermissionDenied).toBe('boolean');
+  });
+
+  it('provides action handlers for acknowledge, snooze and dismiss', async () => {
+    renderToString(React.createElement(TestComponent));
+    expect(latestResult).toBeDefined();
+    if (latestResult) {
+      const ackRes = await latestResult.handleAction('sitting_up', 'test-1');
+      expect(ackRes.success).toBe(true);
+      expect(ackRes.action).toBe('sitting_up');
+
+      const snoozeRes = await latestResult.handleAction('snooze', 'test-1');
+      expect(snoozeRes.success).toBe(true);
+      expect(snoozeRes.action).toBe('snooze');
+
+      const dismissRes = await latestResult.handleAction('dismiss', 'test-1');
+      expect(dismissRes.success).toBe(true);
+      expect(dismissRes.action).toBe('dismiss');
+    }
   });
 });

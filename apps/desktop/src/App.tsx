@@ -102,12 +102,28 @@ export default function App() {
     },
   });
 
-  const { history: notificationHistory, testNotification: triggerNotificationLevel } =
-    useNotifications({
-      onNotificationShown: (record) => {
-        showFeedback(`Notification shown: ${record.title}`);
-      },
-    });
+  const {
+    history: notificationHistory,
+    testNotification: triggerNotificationLevel,
+    permissionState,
+    isPermissionDenied,
+    refreshPermission,
+    handleAction,
+  } = useNotifications({
+    onNotificationShown: (record) => {
+      showFeedback(`Notification shown: ${record.title}`);
+    },
+    onNotificationAcknowledged: (payload) => {
+      setUserXp((prev) => prev + payload.xpEarned);
+      showFeedback(`✓ Sitting up! Reminder acknowledged (+${payload.xpEarned} XP) 🎉`);
+    },
+    onNotificationSnoozed: (payload) => {
+      showFeedback(`💤 Snoozed for ${payload.minutes} minutes`);
+    },
+    onNotificationDismissed: () => {
+      showFeedback(`Notification dismissed`);
+    },
+  });
 
   const [mascotState, setMascotState] = useState<MascotState>('idle');
 
@@ -252,7 +268,7 @@ export default function App() {
                 </span>
               </div>
               <p className="text-xs text-theme-muted font-sans">
-                Tauri 2.0 Desktop Core • Step 1.2 Timer Engine
+                Tauri 2.0 Desktop Core • Step 1.3 Notification System
               </p>
             </div>
           </div>
@@ -304,6 +320,27 @@ export default function App() {
             </div>
           </div>
         </header>
+
+        {/* OS Notification Permission Warning Banner (if disabled at OS level) */}
+        {isPermissionDenied && (
+          <div className="bg-golden-xp/10 border border-golden-xp/40 rounded-xl p-3.5 flex items-center justify-between gap-3 text-xs text-golden-xp animate-in fade-in duration-200">
+            <div className="flex items-center gap-2.5">
+              <span className="text-lg">⚠️</span>
+              <div>
+                <span className="font-bold block">Desktop Notifications are disabled in your OS Settings</span>
+                <span className="text-text-muted-dark text-[11px]">
+                  Reminders will only show inside this app. Enable notifications in Windows Settings to receive toast alerts.
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => refreshPermission()}
+              className="px-2.5 py-1 rounded-md bg-golden-xp/20 hover:bg-golden-xp/30 font-mono text-[11px] text-golden-xp border border-golden-xp/40 transition-colors shrink-0"
+            >
+              Re-check
+            </button>
+          </div>
+        )}
 
         {/* Active Reminder Banner Alert (When Timer Fires!) */}
         {activeReminder && (
@@ -668,14 +705,36 @@ export default function App() {
               </div>
 
               {notificationHistory.length > 0 && (
-                <div className="p-2.5 rounded-lg bg-pond-dark border border-surface-dark font-mono text-[10px] text-text-muted-dark">
-                  <div className="flex items-center justify-between text-lily-pad font-bold mb-1">
-                    <span>LATEST NOTIFICATION</span>
-                    <span>LVL {notificationHistory[0].level}</span>
+                <div className="p-3 rounded-lg bg-pond-dark border border-surface-dark font-mono text-[11px] text-text-muted-dark space-y-2">
+                  <div className="flex items-center justify-between text-lily-pad font-bold">
+                    <span>LATEST NOTIFICATION ({notificationHistory[0].status.toUpperCase()})</span>
+                    <span className="px-1.5 py-0.5 rounded bg-surface-dark text-text-primary-dark">
+                      LVL {notificationHistory[0].level}
+                    </span>
                   </div>
-                  <div className="truncate text-text-primary-dark">
-                    "{notificationHistory[0].body}"
+                  <div className="text-text-primary-dark font-sans text-xs italic">
+                    &ldquo;{notificationHistory[0].body}&rdquo;
                   </div>
+                  {notificationHistory[0].status === 'shown' && (
+                    <div className="flex items-center gap-2 pt-1 font-mono">
+                      <button
+                        type="button"
+                        onClick={() => handleAction('sitting_up', notificationHistory[0].id)}
+                        className="px-2.5 py-1 rounded bg-frog-green/20 hover:bg-frog-green/30 text-frog-green text-[10px] font-bold border border-frog-green/30 transition-colors"
+                        title="Click to acknowledge reminder and earn +15 XP"
+                      >
+                        ✓ Sitting up! (+15 XP)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAction('snooze', notificationHistory[0].id)}
+                        className="px-2.5 py-1 rounded bg-golden-xp/20 hover:bg-golden-xp/30 text-golden-xp text-[10px] font-bold border border-golden-xp/30 transition-colors"
+                        title="Click to snooze reminder by 5 minutes"
+                      >
+                        💤 Snooze 5m
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

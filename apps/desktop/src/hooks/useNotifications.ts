@@ -1,19 +1,54 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   getNotificationHistory,
   setIntensityLevel,
   testNotification,
+  handleNotificationAction,
+  checkNotificationPermission,
   subscribeToNotificationShown,
+  subscribeToNotificationAcknowledged,
+  subscribeToNotificationSnoozed,
+  subscribeToNotificationDismissed,
+  subscribeToNotificationExpired,
   type NotificationRecord,
+  type NotificationAcknowledgedPayload,
+  type NotificationSnoozedPayload,
+  type NotificationDismissedPayload,
+  type NotificationExpiredPayload,
 } from '@/lib/tauri';
 
 export interface UseNotificationsOptions {
   onNotificationShown?: (record: NotificationRecord) => void;
+  onNotificationAcknowledged?: (payload: NotificationAcknowledgedPayload) => void;
+  onNotificationSnoozed?: (payload: NotificationSnoozedPayload) => void;
+  onNotificationDismissed?: (payload: NotificationDismissedPayload) => void;
+  onNotificationExpired?: (payload: NotificationExpiredPayload) => void;
+}
+
+function playNotificationChime(level: number) {
+  // Only Level 3 (Reminder) plays the gentle chime audio
+  // Level 2 (Nudge) uses the system default notification sound
+  // Level 1 (Whisper) is completely silent
+  if (typeof window !== 'undefined' && level === 3) {
+    try {
+      const audio = new Audio('/sounds/notification-chime.wav');
+      audio.volume = 0.85;
+      audio.play().catch(() => {
+        // Autoplay policy or no user interaction yet, ignore
+      });
+    } catch {
+      // Audio not supported in environment
+    }
+  }
 }
 
 export function useNotifications(options: UseNotificationsOptions = {}) {
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
   const [history, setHistory] = useState<NotificationRecord[]>([]);
   const [latestNotification, setLatestNotification] = useState<NotificationRecord | null>(null);
+  const [permissionState, setPermissionState] = useState<'granted' | 'denied' | 'prompt' | 'unknown'>('unknown');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,7 +56,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     setLoading(true);
     setError(null);
     try {
-      const records = await getNotificationHistory(30);
+      const records = await getNotificationHistory(50);
       setHistory(records);
       if (records.length > 0) {
         setLatestNotification(records[0]);
@@ -33,26 +68,131 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     }
   }, []);
 
+  const refreshPermission = useCallback(async () => {
+    try {
+      const perm = await checkNotificationPermission();
+      setPermissionState(perm);
+    } catch (err) {
+      console.warn('Failed to query notification permission:', err);
+    }
+  }, []);
+
   useEffect(() => {
     refreshHistory();
+    refreshPermission();
 
-    let unlisten: (() => void) | undefined;
+    // Re-check permission whenever window gains focus (e.g. returning from Windows Settings)
+    const handleFocus = () => {
+      refreshPermission();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    // Periodic check every 2.5 seconds to detect OS setting changes
+    const permissionInterval = setInterval(() => {
+      refreshPermission();
+    }, 2500);
+
+    const cleanups: (() => void)[] = [
+      () => window.removeEventListener('focus', handleFocus),
+      () => clearInterval(permissionInterval),
+    ];
+
+    // 1. Notification shown event
     subscribeToNotificationShown((record) => {
       setLatestNotification(record);
-      setHistory((prev) => [record, ...prev.slice(0, 49)]);
-      options.onNotificationShown?.(record);
-    })
-      .then((cleanup) => {
-        unlisten = cleanup;
-      })
-      .catch((err) => {
-        console.error('Failed to subscribe to notification-shown:', err);
+      setHistory((prev) => {
+        // Update superseded items and insert new record at top
+        const filtered = prev.filter((r) => r.id !== record.id);
+        return [record, ...filtered.slice(0, 49)];
       });
+      playNotificationChime(record.level);
+      optionsRef.current.onNotificationShown?.(record);
+    }).then((unlisten) => cleanups.push(unlisten));
+
+    // 2. Notification acknowledged event
+    subscribeToNotificationAcknowledged((payload) => {
+      setHistory((prev) =>
+        prev.map((r) => {
+          if (!payload.id || r.id === payload.id) {
+            return { ...r, status: 'acknowledged' };
+          }
+          return r;
+        })
+      );
+      setLatestNotification((current) => {
+        if (!current) return null;
+        if (!payload.id || current.id === payload.id) {
+          return { ...current, status: 'acknowledged' };
+        }
+        return current;
+      });
+      optionsRef.current.onNotificationAcknowledged?.(payload);
+    }).then((unlisten) => cleanups.push(unlisten));
+
+    // 3. Notification snoozed event
+    subscribeToNotificationSnoozed((payload) => {
+      setHistory((prev) =>
+        prev.map((r) => {
+          if (!payload.id || r.id === payload.id) {
+            return { ...r, status: 'snoozed' };
+          }
+          return r;
+        })
+      );
+      setLatestNotification((current) => {
+        if (!current) return null;
+        if (!payload.id || current.id === payload.id) {
+          return { ...current, status: 'snoozed' };
+        }
+        return current;
+      });
+      optionsRef.current.onNotificationSnoozed?.(payload);
+    }).then((unlisten) => cleanups.push(unlisten));
+
+    // 4. Notification dismissed event
+    subscribeToNotificationDismissed((payload) => {
+      setHistory((prev) =>
+        prev.map((r) => {
+          if (!payload.id || r.id === payload.id) {
+            return { ...r, status: 'dismissed' };
+          }
+          return r;
+        })
+      );
+      setLatestNotification((current) => {
+        if (!current) return null;
+        if (!payload.id || current.id === payload.id) {
+          return { ...current, status: 'dismissed' };
+        }
+        return current;
+      });
+      optionsRef.current.onNotificationDismissed?.(payload);
+    }).then((unlisten) => cleanups.push(unlisten));
+
+    // 5. Notification expired event
+    subscribeToNotificationExpired((payload) => {
+      setHistory((prev) =>
+        prev.map((r) => {
+          if (r.id === payload.id) {
+            return { ...r, status: 'expired' };
+          }
+          return r;
+        })
+      );
+      setLatestNotification((current) => {
+        if (!current) return null;
+        if (current.id === payload.id) {
+          return { ...current, status: 'expired' };
+        }
+        return current;
+      });
+      optionsRef.current.onNotificationExpired?.(payload);
+    }).then((unlisten) => cleanups.push(unlisten));
 
     return () => {
-      unlisten?.();
+      cleanups.forEach((c) => c());
     };
-  }, [options.onNotificationShown, refreshHistory]);
+  }, [refreshHistory, refreshPermission]);
 
   const triggerTestNotification = async (level: number) => {
     try {
@@ -75,13 +215,34 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     }
   };
 
+  const executeAction = async (action: 'sitting_up' | 'snooze' | 'dismiss' | string, notificationId?: string) => {
+    try {
+      const notifId = notificationId || latestNotification?.id;
+      return await handleNotificationAction(action, notifId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+  };
+
+  const acknowledge = (notificationId?: string) => executeAction('sitting_up', notificationId);
+  const snooze = (minutes = 5, notificationId?: string) => executeAction('snooze', notificationId);
+  const dismiss = (notificationId?: string) => executeAction('dismiss', notificationId);
+
   return {
     history,
     latestNotification,
+    permissionState,
+    isPermissionDenied: permissionState === 'denied',
     loading,
     error,
     refreshHistory,
+    refreshPermission,
     testNotification: triggerTestNotification,
     setIntensityLevel: updateIntensity,
+    handleAction: executeAction,
+    acknowledge,
+    snooze,
+    dismiss,
   };
 }

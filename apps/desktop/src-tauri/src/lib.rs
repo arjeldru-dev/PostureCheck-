@@ -5,7 +5,10 @@ pub mod tray;
 
 use std::sync::{Arc, Mutex};
 use chrono::NaiveTime;
-use notifications::{show_posture_notification, NotificationManager, NotificationRecord};
+use notifications::{
+    acknowledge_active_notification, show_posture_notification, snooze_active_notification,
+    NotificationManager, NotificationRecord,
+};
 use tauri::{Emitter, Manager, State, WindowEvent};
 use tokio::sync::Notify;
 
@@ -193,6 +196,9 @@ fn acknowledge_reminder(
     let _ = app.emit("tray-state-changed", &tray_payload);
     let _ = app.emit("app-state-changed", &app_payload);
 
+    // Update active notification status and emit notification-acknowledged with XP
+    acknowledge_active_notification(&app, ack_payload.xp_earned);
+
     if let Some(notifier) = app.try_state::<TimerNotifier>() {
         notifier.0.notify_one();
     }
@@ -222,6 +228,9 @@ fn snooze_reminder(
     let _ = app.emit("timer-state-changed", &timer_payload);
     let _ = app.emit("tray-state-changed", &tray_payload);
     let _ = app.emit("app-state-changed", &app_payload);
+
+    // Update active notification status and emit notification-snoozed
+    snooze_active_notification(&app, minutes);
 
     if let Some(notifier) = app.try_state::<TimerNotifier>() {
         notifier.0.notify_one();
@@ -369,6 +378,116 @@ fn send_test_notification(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Command: Process action triggered on a notification (e.g. "sitting_up", "snooze", "dismiss")
+#[tauri::command]
+fn handle_notification_action(
+    action: String,
+    notification_id: Option<String>,
+    app: tauri::AppHandle,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<serde_json::Value, String> {
+    match action.as_str() {
+        "sitting_up" | "acknowledge" => {
+            let ack = acknowledge_reminder(app.clone(), state)?;
+            Ok(serde_json::json!({
+                "action": "sitting_up",
+                "success": true,
+                "xpEarned": ack.xp_earned,
+                "notificationId": notification_id
+            }))
+        }
+        "snooze" => {
+            let _ = snooze_reminder(5, app.clone(), state)?;
+            Ok(serde_json::json!({
+                "action": "snooze",
+                "success": true,
+                "snoozeMinutes": 5,
+                "notificationId": notification_id
+            }))
+        }
+        "dismiss" => {
+            if let Some(id) = &notification_id {
+                if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
+                    if let Ok(mut lock) = mgr.lock() {
+                        lock.update_status(id, "dismissed");
+                    }
+                }
+            }
+            let _ = app.emit(
+                "notification-dismissed",
+                serde_json::json!({
+                    "id": notification_id,
+                    "reason": "user_dismissed"
+                }),
+            );
+            Ok(serde_json::json!({
+                "action": "dismiss",
+                "success": true,
+                "notificationId": notification_id
+            }))
+        }
+        _ => Err(format!("Unknown notification action: {}", action)),
+    }
+}
+
+/// Command: Check OS-level notification permission state
+#[tauri::command]
+fn check_notification_permission(_app: tauri::AppHandle) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::core::HSTRING;
+        use windows::UI::Notifications::{NotificationSetting, ToastNotificationManager};
+
+        // 1. Check WinRT ToastNotifier setting for com.posturecheck.app
+        if let Ok(notifier) = ToastNotificationManager::CreateToastNotifierWithId(&HSTRING::from("com.posturecheck.app")) {
+            if let Ok(setting) = notifier.Setting() {
+                match setting {
+                    NotificationSetting::DisabledForApplication
+                    | NotificationSetting::DisabledForUser
+                    | NotificationSetting::DisabledByGroupPolicy
+                    | NotificationSetting::DisabledByManifest => {
+                        return Ok("denied".to_string());
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // 2. Fallback check: registry Enabled flag for com.posturecheck.app
+        use std::os::windows::process::CommandExt;
+        if let Ok(output) = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                r#"(Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\com.posturecheck.app' -ErrorAction SilentlyContinue).Enabled"#,
+            ])
+            .creation_flags(0x08000000)
+            .output()
+        {
+            let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if text == "0" {
+                return Ok("denied".to_string());
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        use tauri_plugin_notification::NotificationExt;
+        let perm = app.notification().permission_state().map_err(|e| e.to_string())?;
+        let status = match perm {
+            tauri_plugin_notification::PermissionState::Granted => "granted",
+            tauri_plugin_notification::PermissionState::Denied => "denied",
+            tauri_plugin_notification::PermissionState::Prompt
+            | tauri_plugin_notification::PermissionState::PromptWithRationale => "prompt",
+        };
+        return Ok(status.to_string());
+    }
+
+    Ok("granted".to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let notify = Arc::new(Notify::new());
@@ -396,11 +515,16 @@ pub fn run() {
             send_test_notification,
             set_intensity_level,
             get_notification_history,
-            test_notification
+            test_notification,
+            handle_notification_action,
+            check_notification_permission
         ])
         .setup(move |app| {
             // Setup System Tray
             tray::create_tray(app.handle())?;
+
+            #[cfg(target_os = "windows")]
+            crate::notifications::ensure_windows_aumid_registered();
 
             // Start Rust Background Timer Engine
             start_timer_engine(app.handle().clone(), notify);
