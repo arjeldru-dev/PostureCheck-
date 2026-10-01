@@ -226,7 +226,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   };
 
   const acknowledge = (notificationId?: string) => executeAction('sitting_up', notificationId);
-  const snooze = (minutes = 5, notificationId?: string) => executeAction('snooze', notificationId);
+  const snooze = (_minutes = 5, notificationId?: string) => executeAction('snooze', notificationId);
   const dismiss = (notificationId?: string) => executeAction('dismiss', notificationId);
 
   return {

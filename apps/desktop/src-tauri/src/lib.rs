@@ -54,14 +54,11 @@ fn toggle_pause(
     };
 
     if let Some(db) = app.try_state::<Database>() {
-        let _ = db.save_app_state(&PersistedAppState {
-            id: 1,
-            is_paused: tray_payload.status == "paused",
-            is_dnd: tray_payload.is_dnd,
-            dnd_until: tray_payload.dnd_until.clone(),
-            theme_mode: "system".to_string(),
-            launch_on_startup: false,
-        });
+        let mut current_state = db.get_app_state().unwrap_or_default();
+        current_state.is_paused = tray_payload.status == "paused";
+        current_state.is_dnd = tray_payload.is_dnd;
+        current_state.dnd_until = tray_payload.dnd_until.clone();
+        let _ = db.save_app_state(&current_state);
     }
 
     let _ = app.emit("tray-state-changed", &tray_payload);
@@ -94,14 +91,11 @@ fn set_dnd(
     };
 
     if let Some(db) = app.try_state::<Database>() {
-        let _ = db.save_app_state(&PersistedAppState {
-            id: 1,
-            is_paused: tray_payload.status == "paused",
-            is_dnd: tray_payload.is_dnd,
-            dnd_until: tray_payload.dnd_until.clone(),
-            theme_mode: "system".to_string(),
-            launch_on_startup: false,
-        });
+        let mut current_state = db.get_app_state().unwrap_or_default();
+        current_state.is_paused = tray_payload.status == "paused";
+        current_state.is_dnd = tray_payload.is_dnd;
+        current_state.dnd_until = tray_payload.dnd_until.clone();
+        let _ = db.save_app_state(&current_state);
     }
 
     let _ = app.emit("tray-state-changed", &tray_payload);
@@ -138,14 +132,11 @@ fn cancel_dnd(
     };
 
     if let Some(db) = app.try_state::<Database>() {
-        let _ = db.save_app_state(&PersistedAppState {
-            id: 1,
-            is_paused: tray_payload.status == "paused",
-            is_dnd: tray_payload.is_dnd,
-            dnd_until: tray_payload.dnd_until.clone(),
-            theme_mode: "system".to_string(),
-            launch_on_startup: false,
-        });
+        let mut current_state = db.get_app_state().unwrap_or_default();
+        current_state.is_paused = tray_payload.status == "paused";
+        current_state.is_dnd = tray_payload.is_dnd;
+        current_state.dnd_until = tray_payload.dnd_until.clone();
+        let _ = db.save_app_state(&current_state);
     }
 
     let _ = app.emit("tray-state-changed", &tray_payload);
@@ -665,6 +656,184 @@ fn save_app_state(
     db.save_app_state(&state)
 }
 
+/// Command: Get all profiles from database
+#[tauri::command]
+fn get_profiles(db: State<'_, Database>) -> Result<Vec<PostureSettings>, String> {
+    db.get_profiles()
+}
+
+/// Command: Switch active profile and sync timer engine
+#[tauri::command]
+fn switch_profile(
+    profile_id: String,
+    app: tauri::AppHandle,
+    state: State<'_, Mutex<AppState>>,
+    db: State<'_, Database>,
+) -> Result<PostureSettings, String> {
+    let saved = db.switch_profile(&profile_id)?;
+
+    let (tray_payload, timer_payload, app_payload) = {
+        let mut app_state = state.lock().map_err(|e| e.to_string())?;
+        app_state.timer.set_interval(saved.interval_minutes);
+        app_state.timer.escalation_enabled = saved.auto_escalation;
+
+        if let Ok(start) = NaiveTime::parse_from_str(&saved.active_hours_start, "%H:%M") {
+            if let Ok(end) = NaiveTime::parse_from_str(&saved.active_hours_end, "%H:%M") {
+                app_state.timer.set_active_hours(start, end);
+            }
+        }
+
+        let parsed_days: Vec<u8> = saved
+            .active_days
+            .split(',')
+            .filter_map(|s| s.trim().parse::<u8>().ok())
+            .collect();
+        if !parsed_days.is_empty() {
+            app_state.timer.set_active_days(parsed_days);
+        }
+
+        app_state.sync_from_timer();
+        (
+            app_state.to_tray_payload(),
+            app_state.to_timer_payload(),
+            app_state.to_app_payload(),
+        )
+    };
+
+    let _ = app.emit("settings-changed", &saved);
+    let _ = app.emit("tray-state-changed", &tray_payload);
+    let _ = app.emit("timer-state-changed", &timer_payload);
+    let _ = app.emit("app-state-changed", &app_payload);
+
+    if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
+        if let Ok(mut lock) = mgr.lock() {
+            lock.default_intensity_level = saved.intensity_level;
+        }
+    }
+
+    if let Some(notifier) = app.try_state::<TimerNotifier>() {
+        notifier.0.notify_one();
+    }
+
+    update_tray_visuals(&app);
+    Ok(saved)
+}
+
+/// Command: Create a new custom posture profile
+#[tauri::command]
+fn create_profile(
+    settings: SaveSettingsInput,
+    db: State<'_, Database>,
+) -> Result<PostureSettings, String> {
+    db.create_profile(settings)
+}
+
+/// Command: Delete a posture profile
+#[tauri::command]
+fn delete_profile(
+    profile_id: String,
+    db: State<'_, Database>,
+) -> Result<bool, String> {
+    db.delete_profile(&profile_id)
+}
+
+/// Command: Clear all posture check history
+#[tauri::command]
+fn clear_posture_history(db: State<'_, Database>) -> Result<usize, String> {
+    db.clear_posture_history()
+}
+
+/// Command: Export complete app & posture check data as JSON
+#[tauri::command]
+fn export_posture_data(db: State<'_, Database>) -> Result<String, String> {
+    db.export_posture_data()
+}
+
+/// Command: Set launch on startup preference and Windows registry Run key
+#[tauri::command]
+fn set_launch_on_startup(
+    enabled: bool,
+    db: State<'_, Database>,
+) -> Result<bool, String> {
+    let mut state = db.get_app_state().unwrap_or_default();
+    state.launch_on_startup = enabled;
+    db.save_app_state(&state)?;
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        if enabled {
+            if let Ok(current_exe) = std::env::current_exe() {
+                let exe_str = current_exe.to_string_lossy().replace('\'', "''");
+                let _ = std::process::Command::new("powershell")
+                    .args([
+                        "-NoProfile",
+                        "-NonInteractive",
+                        "-Command",
+                        &format!(
+                            r#"Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'PostureCheck' -Value '"{}"'"#,
+                            exe_str
+                        ),
+                    ])
+                    .creation_flags(0x08000000)
+                    .output();
+            }
+        } else {
+            let _ = std::process::Command::new("powershell")
+                .args([
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    r#"Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'PostureCheck' -ErrorAction SilentlyContinue"#,
+                ])
+                .creation_flags(0x08000000)
+                .output();
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // On macOS / Linux platforms, launch_on_startup preference is saved in SQLite app_state;
+        // OS autostart files (LaunchAgents / .desktop entries) are handled during packaging/installation.
+    }
+
+    Ok(enabled)
+}
+
+/// Command: Open an external URL in the system default browser safely
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err("Only http and https URLs are allowed".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        std::process::Command::new("rundll32")
+            .args(["url.dll,FileProtocolHandler", &url])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .spawn()
+            .map_err(|e| format!("Failed to open URL: {}", e))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| format!("Failed to open URL: {}", e))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| format!("Failed to open URL: {}", e))?;
+    }
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let notify = Arc::new(Notify::new());
@@ -703,7 +872,15 @@ pub fn run() {
             get_today_stats,
             get_persisted_app_state,
             save_app_state,
-            show_posture_notification
+            show_posture_notification,
+            get_profiles,
+            switch_profile,
+            create_profile,
+            delete_profile,
+            clear_posture_history,
+            export_posture_data,
+            set_launch_on_startup,
+            open_external_url
         ])
         .setup(move |app| {
             // 1. Initialize SQLite Database and run migrations

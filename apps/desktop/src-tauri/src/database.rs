@@ -256,40 +256,75 @@ impl Database {
         let tx = conn.transaction().map_err(|e| e.to_string())?;
 
         let mut current = {
-            let mut stmt = tx
-                .prepare(
-                    "SELECT id, profile_name, interval_minutes, intensity_level,
-                            active_hours_start, active_hours_end, active_days,
-                            routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                            created_at, updated_at
-                     FROM posture_settings
-                     WHERE is_active_profile = 1
-                     ORDER BY created_at ASC
-                     LIMIT 1",
-                )
-                .map_err(|e| e.to_string())?;
+            if let Some(ref target_id) = input.id {
+                let mut stmt = tx
+                    .prepare(
+                        "SELECT id, profile_name, interval_minutes, intensity_level,
+                                active_hours_start, active_hours_end, active_days,
+                                routing_mode, auto_escalation, dnd_enabled, is_active_profile,
+                                created_at, updated_at
+                         FROM posture_settings
+                         WHERE id = ?1",
+                    )
+                    .map_err(|e| e.to_string())?;
 
-            let res = stmt
-                .query_row([], |row| {
-                    Ok(PostureSettings {
-                        id: row.get(0)?,
-                        profile_name: row.get(1)?,
-                        interval_minutes: row.get(2)?,
-                        intensity_level: row.get(3)?,
-                        active_hours_start: row.get(4)?,
-                        active_hours_end: row.get(5)?,
-                        active_days: row.get(6)?,
-                        routing_mode: row.get(7)?,
-                        auto_escalation: row.get::<_, i64>(8)? != 0,
-                        dnd_enabled: row.get::<_, i64>(9)? != 0,
-                        is_active_profile: row.get::<_, i64>(10)? != 0,
-                        created_at: row.get(11)?,
-                        updated_at: row.get(12)?,
+                let res = stmt
+                    .query_row(params![target_id], |row| {
+                        Ok(PostureSettings {
+                            id: row.get(0)?,
+                            profile_name: row.get(1)?,
+                            interval_minutes: row.get(2)?,
+                            intensity_level: row.get(3)?,
+                            active_hours_start: row.get(4)?,
+                            active_hours_end: row.get(5)?,
+                            active_days: row.get(6)?,
+                            routing_mode: row.get(7)?,
+                            auto_escalation: row.get::<_, i64>(8)? != 0,
+                            dnd_enabled: row.get::<_, i64>(9)? != 0,
+                            is_active_profile: row.get::<_, i64>(10)? != 0,
+                            created_at: row.get(11)?,
+                            updated_at: row.get(12)?,
+                        })
                     })
-                })
-                .optional()
-                .map_err(|e| e.to_string())?;
-            res.unwrap_or_default()
+                    .optional()
+                    .map_err(|e| e.to_string())?;
+                res.unwrap_or_default()
+            } else {
+                let mut stmt = tx
+                    .prepare(
+                        "SELECT id, profile_name, interval_minutes, intensity_level,
+                                active_hours_start, active_hours_end, active_days,
+                                routing_mode, auto_escalation, dnd_enabled, is_active_profile,
+                                created_at, updated_at
+                         FROM posture_settings
+                         WHERE is_active_profile = 1
+                         ORDER BY created_at ASC
+                         LIMIT 1",
+                    )
+                    .map_err(|e| e.to_string())?;
+
+                let res = stmt
+                    .query_row([], |row| {
+                        Ok(PostureSettings {
+                            id: row.get(0)?,
+                            profile_name: row.get(1)?,
+                            interval_minutes: row.get(2)?,
+                            intensity_level: row.get(3)?,
+                            active_hours_start: row.get(4)?,
+                            active_hours_end: row.get(5)?,
+                            active_days: row.get(6)?,
+                            routing_mode: row.get(7)?,
+                            auto_escalation: row.get::<_, i64>(8)? != 0,
+                            dnd_enabled: row.get::<_, i64>(9)? != 0,
+                            is_active_profile: row.get::<_, i64>(10)? != 0,
+                            created_at: row.get(11)?,
+                            updated_at: row.get(12)?,
+                        })
+                    })
+                    .optional()
+                    .map_err(|e| e.to_string())?;
+                res.unwrap_or_default()
+            }
         };
 
         if let Some(profile_name) = input.profile_name {
@@ -859,6 +894,240 @@ impl Database {
             xp_earned_today: xp_earned,
         })
     }
+
+    /// Retrieve all posture profiles ordered by creation
+    pub fn get_profiles(&self) -> Result<Vec<PostureSettings>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, profile_name, interval_minutes, intensity_level,
+                        active_hours_start, active_hours_end, active_days,
+                        routing_mode, auto_escalation, dnd_enabled, is_active_profile,
+                        created_at, updated_at
+                 FROM posture_settings
+                 ORDER BY created_at ASC",
+            )
+            .map_err(|e| e.to_string())?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(PostureSettings {
+                    id: row.get(0)?,
+                    profile_name: row.get(1)?,
+                    interval_minutes: row.get(2)?,
+                    intensity_level: row.get(3)?,
+                    active_hours_start: row.get(4)?,
+                    active_hours_end: row.get(5)?,
+                    active_days: row.get(6)?,
+                    routing_mode: row.get(7)?,
+                    auto_escalation: row.get::<_, i64>(8)? != 0,
+                    dnd_enabled: row.get::<_, i64>(9)? != 0,
+                    is_active_profile: row.get::<_, i64>(10)? != 0,
+                    created_at: row.get(11)?,
+                    updated_at: row.get(12)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+
+        let mut profiles = Vec::new();
+        for r in rows {
+            profiles.push(r.map_err(|e| e.to_string())?);
+        }
+        Ok(profiles)
+    }
+
+    /// Switch active posture profile by ID
+    pub fn switch_profile(&self, profile_id: &str) -> Result<PostureSettings, String> {
+        let now_utc = Utc::now().to_rfc3339();
+        let mut conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+        tx.execute("UPDATE posture_settings SET is_active_profile = 0", [])
+            .map_err(|e| e.to_string())?;
+
+        let updated = tx
+            .execute(
+                "UPDATE posture_settings SET is_active_profile = 1, updated_at = ?1 WHERE id = ?2",
+                params![now_utc, profile_id],
+            )
+            .map_err(|e| e.to_string())?;
+
+        if updated == 0 {
+            return Err(format!("Profile with ID {} not found", profile_id));
+        }
+
+        let mut stmt = tx
+            .prepare(
+                "SELECT id, profile_name, interval_minutes, intensity_level,
+                        active_hours_start, active_hours_end, active_days,
+                        routing_mode, auto_escalation, dnd_enabled, is_active_profile,
+                        created_at, updated_at
+                 FROM posture_settings
+                 WHERE id = ?1",
+            )
+            .map_err(|e| e.to_string())?;
+
+        let profile = stmt
+            .query_row(params![profile_id], |row| {
+                Ok(PostureSettings {
+                    id: row.get(0)?,
+                    profile_name: row.get(1)?,
+                    interval_minutes: row.get(2)?,
+                    intensity_level: row.get(3)?,
+                    active_hours_start: row.get(4)?,
+                    active_hours_end: row.get(5)?,
+                    active_days: row.get(6)?,
+                    routing_mode: row.get(7)?,
+                    auto_escalation: row.get::<_, i64>(8)? != 0,
+                    dnd_enabled: row.get::<_, i64>(9)? != 0,
+                    is_active_profile: row.get::<_, i64>(10)? != 0,
+                    created_at: row.get(11)?,
+                    updated_at: row.get(12)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+
+        drop(stmt);
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(profile)
+    }
+
+    /// Create a new named profile
+    pub fn create_profile(&self, input: SaveSettingsInput) -> Result<PostureSettings, String> {
+        let now_utc = Utc::now().to_rfc3339();
+        let id = input.id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+        let profile_name = input.profile_name.unwrap_or_else(|| "Custom Profile".to_string());
+        let interval_minutes = input.interval_minutes.unwrap_or(30);
+        let intensity_level = input.intensity_level.unwrap_or(2);
+        let active_hours_start = input.active_hours_start.unwrap_or_else(|| "08:00".to_string());
+        let active_hours_end = input.active_hours_end.unwrap_or_else(|| "22:00".to_string());
+        let active_days = input.active_days.unwrap_or_else(|| "1,2,3,4,5,6,7".to_string());
+        let routing_mode = input.routing_mode.unwrap_or_else(|| "pc_only".to_string());
+        let auto_escalation = input.auto_escalation.unwrap_or(false);
+        let dnd_enabled = input.dnd_enabled.unwrap_or(false);
+        let make_active = input.is_active_profile.unwrap_or(false);
+
+        let mut conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+        if make_active {
+            tx.execute("UPDATE posture_settings SET is_active_profile = 0", [])
+                .map_err(|e| e.to_string())?;
+        }
+
+        let profile = PostureSettings {
+            id: id.clone(),
+            profile_name,
+            interval_minutes,
+            intensity_level,
+            active_hours_start,
+            active_hours_end,
+            active_days,
+            routing_mode,
+            auto_escalation,
+            dnd_enabled,
+            is_active_profile: make_active,
+            created_at: now_utc.clone(),
+            updated_at: now_utc.clone(),
+        };
+
+        tx.execute(
+            "INSERT INTO posture_settings (
+                id, profile_name, interval_minutes, intensity_level,
+                active_hours_start, active_hours_end, active_days,
+                routing_mode, auto_escalation, dnd_enabled, is_active_profile,
+                created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            params![
+                profile.id,
+                profile.profile_name,
+                profile.interval_minutes,
+                profile.intensity_level,
+                profile.active_hours_start,
+                profile.active_hours_end,
+                profile.active_days,
+                profile.routing_mode,
+                if profile.auto_escalation { 1 } else { 0 },
+                if profile.dnd_enabled { 1 } else { 0 },
+                if profile.is_active_profile { 1 } else { 0 },
+                profile.created_at,
+                profile.updated_at,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(profile)
+    }
+
+    /// Delete a profile by ID
+    pub fn delete_profile(&self, profile_id: &str) -> Result<bool, String> {
+        let mut conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+        let count: i64 = tx
+            .query_row("SELECT COUNT(*) FROM posture_settings", [], |r| r.get(0))
+            .map_err(|e| e.to_string())?;
+        if count <= 1 {
+            return Err("Cannot delete the only remaining profile".to_string());
+        }
+
+        let is_active: bool = tx
+            .query_row(
+                "SELECT is_active_profile FROM posture_settings WHERE id = ?1",
+                params![profile_id],
+                |r| Ok(r.get::<_, i64>(0)? != 0),
+            )
+            .map_err(|e| e.to_string())?;
+
+        if is_active {
+            tx.execute(
+                "UPDATE posture_settings SET is_active_profile = 1 WHERE id != ?1 ORDER BY created_at ASC LIMIT 1",
+                params![profile_id],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+
+        let rows = tx
+            .execute("DELETE FROM posture_settings WHERE id = ?1", params![profile_id])
+            .map_err(|e| e.to_string())?;
+
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(rows > 0)
+    }
+
+    /// Clear all logged posture checks
+    pub fn clear_posture_history(&self) -> Result<usize, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let rows = conn
+            .execute("DELETE FROM posture_checks", [])
+            .map_err(|e| e.to_string())?;
+        Ok(rows)
+    }
+
+    /// Export all application and posture check data as a structured JSON string
+    pub fn export_posture_data(&self) -> Result<String, String> {
+        let active_settings = self.get_settings()?;
+        let profiles = self.get_profiles()?;
+        let checks = self.get_posture_checks(10000, 0)?;
+        let progress = self.get_user_progress()?;
+        let achievements = self.get_achievements()?;
+        let app_state = self.get_app_state()?;
+
+        let export = serde_json::json!({
+            "exportDate": Utc::now().to_rfc3339(),
+            "appName": "Posture Check! Desktop",
+            "version": "0.1.0",
+            "activeSettings": active_settings,
+            "profiles": profiles,
+            "postureChecks": checks,
+            "userProgress": progress,
+            "achievements": achievements,
+            "appState": app_state,
+        });
+
+        serde_json::to_string_pretty(&export).map_err(|e| e.to_string())
+    }
 }
 
 /// Apply database schema and seed migrations in sequential order
@@ -922,6 +1191,18 @@ pub fn apply_migrations(conn: &Connection) -> Result<(), String> {
             .map_err(|e| format!("Migration 003_add_posture_checks_index failed: {}", e))?;
         conn.execute(
             "INSERT INTO _migrations (version, description) VALUES (3, 'add_posture_checks_index')",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    // 004_seed_quick_profiles
+    if !applied_versions.contains(&4) {
+        let sql_004 = include_str!("../migrations/004_seed_quick_profiles.sql");
+        conn.execute_batch(sql_004)
+            .map_err(|e| format!("Migration 004_seed_quick_profiles failed: {}", e))?;
+        conn.execute(
+            "INSERT INTO _migrations (version, description) VALUES (4, 'seed_quick_profiles')",
             [],
         )
         .map_err(|e| e.to_string())?;
@@ -1237,5 +1518,63 @@ mod tests {
 
         // Clean up temp dir
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_profile_management_operations() {
+        let db = init_test_database();
+        let profiles = db.get_profiles().expect("get profiles");
+        // Should have Default, Work, Gaming
+        assert_eq!(profiles.len(), 3);
+        assert_eq!(profiles[0].profile_name, "Default");
+        assert!(profiles[0].is_active_profile);
+
+        // Switch to Work profile
+        let work_id = profiles.iter().find(|p| p.profile_name == "Work").unwrap().id.clone();
+        let switched = db.switch_profile(&work_id).expect("switch to work");
+        assert_eq!(switched.profile_name, "Work");
+        assert!(switched.is_active_profile);
+
+        let active = db.get_settings().expect("get active settings");
+        assert_eq!(active.profile_name, "Work");
+        assert_eq!(active.interval_minutes, 45);
+
+        // Create a new Chill profile
+        let created = db.create_profile(SaveSettingsInput {
+            profile_name: Some("Chill".to_string()),
+            interval_minutes: Some(60),
+            intensity_level: Some(1),
+            ..Default::default()
+        }).expect("create chill profile");
+        assert_eq!(created.profile_name, "Chill");
+
+        let all_after_create = db.get_profiles().expect("profiles after create");
+        assert_eq!(all_after_create.len(), 4);
+
+        // Delete Chill profile
+        let deleted = db.delete_profile(&created.id).expect("delete chill");
+        assert!(deleted);
+        let all_after_delete = db.get_profiles().expect("profiles after delete");
+        assert_eq!(all_after_delete.len(), 3);
+    }
+
+    #[test]
+    fn test_export_and_clear_history() {
+        let db = init_test_database();
+        let _ = db.log_posture_check(NewPostureCheck {
+            id: Some("chk-1".to_string()),
+            fired_at: None,
+            intensity_level: 2,
+            message_shown: Some("Test message".to_string()),
+        }).expect("log check");
+
+        let json = db.export_posture_data().expect("export data");
+        assert!(json.contains("Posture Check! Desktop"));
+        assert!(json.contains("chk-1"));
+
+        let cleared = db.clear_posture_history().expect("clear history");
+        assert_eq!(cleared, 1);
+        let checks_after = db.get_posture_checks(10, 0).expect("checks after clear");
+        assert_eq!(checks_after.len(), 0);
     }
 }

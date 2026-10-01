@@ -43,7 +43,7 @@ export interface TimerStoreState {
   tickSecond: () => void;
 }
 
-export const useTimerStore = create<TimerStoreState>((set, get) => ({
+export const useTimerStore = create<TimerStoreState>((set) => ({
   intervalMinutes: 30,
   nextFireAt: null,
   isRunning: true,

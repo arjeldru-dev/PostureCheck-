@@ -498,15 +498,22 @@ export async function testNotification(level: number): Promise<NotificationRecor
   return notif;
 }
 
+export interface NotificationActionResult {
+  action: string;
+  success: boolean;
+  xpEarned?: number;
+  notificationId?: string | null;
+}
+
 /**
  * Handle action clicked on a notification (e.g. "sitting_up", "snooze", "dismiss")
  */
 export async function handleNotificationAction(
   action: 'sitting_up' | 'snooze' | 'dismiss' | string,
   notificationId?: string
-): Promise<any> {
+): Promise<NotificationActionResult> {
   if (isTauriEnvironment()) {
-    return await invoke('handle_notification_action', { action, notificationId });
+    return await invoke<NotificationActionResult>('handle_notification_action', { action, notificationId });
   }
   if (notificationId) {
     const item = mockNotificationHistory.find((n) => n.id === notificationId);
@@ -611,4 +618,334 @@ export async function subscribeToNotificationExpired(
   return () => {};
 }
 
+export interface PostureSettingsPayload {
+  id: string;
+  profileName: string;
+  intervalMinutes: number;
+  intensityLevel: number;
+  activeHoursStart: string;
+  activeHoursEnd: string;
+  activeDays: string;
+  routingMode: 'pc_only' | 'phone_only' | 'both';
+  autoEscalation: boolean;
+  dndEnabled: boolean;
+  isActiveProfile: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
+export interface SaveSettingsPayload {
+  id?: string;
+  profileName?: string;
+  intervalMinutes?: number;
+  intensityLevel?: number;
+  activeHoursStart?: string;
+  activeHoursEnd?: string;
+  activeDays?: string;
+  routingMode?: 'pc_only' | 'phone_only' | 'both';
+  autoEscalation?: boolean;
+  dndEnabled?: boolean;
+  isActiveProfile?: boolean;
+}
+
+export interface PersistedAppStatePayload {
+  id: number;
+  isPaused: boolean;
+  isDnd: boolean;
+  dndUntil: string | null;
+  themeMode: string;
+  launchOnStartup: boolean;
+}
+
+// In-memory mock profiles and settings for testing/browser environments
+const mockProfiles: PostureSettingsPayload[] = [
+  {
+    id: '00000000-0000-0000-0000-000000000001',
+    profileName: 'Default',
+    intervalMinutes: 30,
+    intensityLevel: 2,
+    activeHoursStart: '08:00',
+    activeHoursEnd: '22:00',
+    activeDays: '1,2,3,4,5,6,7',
+    routingMode: 'pc_only',
+    autoEscalation: false,
+    dndEnabled: false,
+    isActiveProfile: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: '00000000-0000-0000-0000-000000000002',
+    profileName: 'Work',
+    intervalMinutes: 45,
+    intensityLevel: 2,
+    activeHoursStart: '09:00',
+    activeHoursEnd: '18:00',
+    activeDays: '1,2,3,4,5',
+    routingMode: 'pc_only',
+    autoEscalation: false,
+    dndEnabled: false,
+    isActiveProfile: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: '00000000-0000-0000-0000-000000000003',
+    profileName: 'Gaming',
+    intervalMinutes: 30,
+    intensityLevel: 3,
+    activeHoursStart: '18:00',
+    activeHoursEnd: '23:00',
+    activeDays: '1,2,3,4,5,6,7',
+    routingMode: 'phone_only',
+    autoEscalation: true,
+    dndEnabled: false,
+    isActiveProfile: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+const mockAppStatePayload: PersistedAppStatePayload = {
+  id: 1,
+  isPaused: false,
+  isDnd: false,
+  dndUntil: null,
+  themeMode: 'system',
+  launchOnStartup: false,
+};
+
+/**
+ * Fetch active posture settings from SQLite (or mock)
+ */
+export async function getSettings(): Promise<PostureSettingsPayload> {
+  if (isTauriEnvironment()) {
+    return await invoke<PostureSettingsPayload>('get_settings');
+  }
+  const active = mockProfiles.find((p) => p.isActiveProfile) || mockProfiles[0];
+  return { ...active };
+}
+
+/**
+ * Save posture settings and update timer in SQLite (or mock)
+ */
+export async function saveSettings(
+  input: SaveSettingsPayload
+): Promise<PostureSettingsPayload> {
+  if (isTauriEnvironment()) {
+    return await invoke<PostureSettingsPayload>('save_settings', { settings: input });
+  }
+
+  const activeIdx = mockProfiles.findIndex((p) => p.isActiveProfile);
+  const targetIdx = activeIdx >= 0 ? activeIdx : 0;
+  const current = mockProfiles[targetIdx];
+
+  const updated: PostureSettingsPayload = {
+    ...current,
+    profileName: input.profileName ?? current.profileName,
+    intervalMinutes: input.intervalMinutes ?? current.intervalMinutes,
+    intensityLevel: input.intensityLevel ?? current.intensityLevel,
+    activeHoursStart: input.activeHoursStart ?? current.activeHoursStart,
+    activeHoursEnd: input.activeHoursEnd ?? current.activeHoursEnd,
+    activeDays: input.activeDays ?? current.activeDays,
+    routingMode: input.routingMode ?? current.routingMode,
+    autoEscalation: input.autoEscalation ?? current.autoEscalation,
+    dndEnabled: input.dndEnabled ?? current.dndEnabled,
+    updatedAt: new Date().toISOString(),
+  };
+
+  mockProfiles[targetIdx] = updated;
+  if (input.intervalMinutes) {
+    mockTimerState.intervalMinutes = input.intervalMinutes;
+  }
+  return { ...updated };
+}
+
+/**
+ * Get all available quick profiles
+ */
+export async function getProfiles(): Promise<PostureSettingsPayload[]> {
+  if (isTauriEnvironment()) {
+    return await invoke<PostureSettingsPayload[]>('get_profiles');
+  }
+  return mockProfiles.map((p) => ({ ...p }));
+}
+
+/**
+ * Switch active profile by ID
+ */
+export async function switchProfile(
+  profileId: string
+): Promise<PostureSettingsPayload> {
+  if (isTauriEnvironment()) {
+    return await invoke<PostureSettingsPayload>('switch_profile', { profileId });
+  }
+
+  mockProfiles.forEach((p) => {
+    p.isActiveProfile = p.id === profileId;
+  });
+
+  const activated = mockProfiles.find((p) => p.id === profileId) || mockProfiles[0];
+  mockTimerState.intervalMinutes = activated.intervalMinutes;
+  mockTimerState.activeHoursStart = activated.activeHoursStart;
+  mockTimerState.activeHoursEnd = activated.activeHoursEnd;
+  return { ...activated };
+}
+
+/**
+ * Create a new custom posture profile
+ */
+export async function createProfile(
+  input: SaveSettingsPayload
+): Promise<PostureSettingsPayload> {
+  if (isTauriEnvironment()) {
+    return await invoke<PostureSettingsPayload>('create_profile', { settings: input });
+  }
+
+  const newProfile: PostureSettingsPayload = {
+    id: input.id ?? `profile-${Date.now()}`,
+    profileName: input.profileName ?? 'Custom Profile',
+    intervalMinutes: input.intervalMinutes ?? 30,
+    intensityLevel: input.intensityLevel ?? 2,
+    activeHoursStart: input.activeHoursStart ?? '08:00',
+    activeHoursEnd: input.activeHoursEnd ?? '22:00',
+    activeDays: input.activeDays ?? '1,2,3,4,5,6,7',
+    routingMode: input.routingMode ?? 'pc_only',
+    autoEscalation: input.autoEscalation ?? false,
+    dndEnabled: input.dndEnabled ?? false,
+    isActiveProfile: input.isActiveProfile ?? false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (newProfile.isActiveProfile) {
+    mockProfiles.forEach((p) => {
+      p.isActiveProfile = false;
+    });
+  }
+
+  mockProfiles.push(newProfile);
+  return { ...newProfile };
+}
+
+/**
+ * Delete a profile by ID
+ */
+export async function deleteProfile(profileId: string): Promise<boolean> {
+  if (isTauriEnvironment()) {
+    return await invoke<boolean>('delete_profile', { profileId });
+  }
+
+  if (mockProfiles.length <= 1) {
+    throw new Error('Cannot delete the only remaining profile');
+  }
+
+  const idx = mockProfiles.findIndex((p) => p.id === profileId);
+  if (idx >= 0) {
+    const wasActive = mockProfiles[idx].isActiveProfile;
+    mockProfiles.splice(idx, 1);
+    if (wasActive && mockProfiles.length > 0) {
+      mockProfiles[0].isActiveProfile = true;
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Clear all posture check history from SQLite
+ */
+export async function clearPostureHistory(): Promise<number> {
+  if (isTauriEnvironment()) {
+    return await invoke<number>('clear_posture_history');
+  }
+  const cleared = mockNotificationHistory.length;
+  mockNotificationHistory.length = 0;
+  return cleared;
+}
+
+/**
+ * Export complete app and posture check history as JSON
+ */
+export async function exportPostureData(): Promise<string> {
+  if (isTauriEnvironment()) {
+    return await invoke<string>('export_posture_data');
+  }
+
+  const exportObj = {
+    exportDate: new Date().toISOString(),
+    appName: 'Posture Check! Desktop (Web Preview)',
+    version: '0.1.0',
+    activeSettings: mockProfiles.find((p) => p.isActiveProfile) || mockProfiles[0],
+    profiles: mockProfiles,
+    postureChecks: mockNotificationHistory,
+    appState: mockAppStatePayload,
+  };
+  return JSON.stringify(exportObj, null, 2);
+}
+
+/**
+ * Set launch on startup preference
+ */
+export async function setLaunchOnStartup(enabled: boolean): Promise<boolean> {
+  if (isTauriEnvironment()) {
+    return await invoke<boolean>('set_launch_on_startup', { enabled });
+  }
+  mockAppStatePayload.launchOnStartup = enabled;
+  return enabled;
+}
+
+/**
+ * Get persisted app state
+ */
+export async function getPersistedAppState(): Promise<PersistedAppStatePayload> {
+  if (isTauriEnvironment()) {
+    return await invoke<PersistedAppStatePayload>('get_persisted_app_state');
+  }
+  return { ...mockAppStatePayload };
+}
+
+/**
+ * Save persisted app state
+ */
+export async function saveAppState(
+  state: Partial<PersistedAppStatePayload>
+): Promise<PersistedAppStatePayload> {
+  const merged = { ...mockAppStatePayload, ...state };
+  if (isTauriEnvironment()) {
+    return await invoke<PersistedAppStatePayload>('save_app_state', { state: merged });
+  }
+  Object.assign(mockAppStatePayload, merged);
+  return { ...mockAppStatePayload };
+}
+
+/**
+ * Subscribe to settings-changed events emitted by Tauri
+ */
+export async function subscribeToSettingsChanged(
+  callback: (settings: PostureSettingsPayload) => void
+): Promise<() => void> {
+  if (isTauriEnvironment()) {
+    const unlisten = await listen<PostureSettingsPayload>('settings-changed', (event) => {
+      callback(event.payload);
+    });
+    return unlisten;
+  }
+  return () => {};
+}
+/**
+ * Open external URL in system default browser safely
+ */
+export async function openExternalUrl(url: string): Promise<void> {
+  if (isTauriEnvironment()) {
+    try {
+      await invoke('open_external_url', { url });
+      return;
+    } catch (err) {
+      console.error('Failed to open external url via Tauri command:', err);
+    }
+  }
+  if (typeof window !== 'undefined') {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}

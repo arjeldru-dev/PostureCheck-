@@ -1,6 +1,6 @@
 import '../global.css';
 import React, { useEffect } from 'react';
-import { View, Platform, StyleSheet } from 'react-native';
+import { View, Platform, StyleSheet, type ViewStyle } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -56,21 +56,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A0F17',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: '100vh' as any,
+    minHeight: '100vh' as unknown as number,
     width: '100%',
   },
   phoneFrame: {
     width: '100%',
     maxWidth: 440,
     flex: 1,
-    minHeight: '100vh' as any,
+    minHeight: '100vh' as unknown as number,
     backgroundColor: '#1A2332',
     overflow: 'hidden',
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderColor: '#243447',
-    boxShadow:
-      '0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(76, 175, 80, 0.15)',
-  } as any,
+    ...({
+      boxShadow:
+        '0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(76, 175, 80, 0.15)',
+    } as unknown as ViewStyle),
+  },
 });
 

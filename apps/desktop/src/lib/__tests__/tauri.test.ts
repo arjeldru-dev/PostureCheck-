@@ -3,11 +3,11 @@ import {
   fetchAppState,
   getTrayState,
   isTauriEnvironment,
-  subscribeToTrayState,
   togglePause,
   updateTimerInterval,
   setDnd,
   cancelDnd,
+  openExternalUrl,
 } from '../tauri';
 
 describe('Tauri Frontend IPC Wrapper (Browser Mode)', () => {
@@ -74,10 +74,22 @@ describe('Tauri Frontend IPC Wrapper (Browser Mode)', () => {
     expect(normalState.status).toBe('active');
   });
 
-  it('returns clean unlisten function when subscribing to tray state in web mode', async () => {
-    const callback = () => {};
-    const unlisten = await subscribeToTrayState(callback);
-    expect(typeof unlisten).toBe('function');
-    expect(() => unlisten()).not.toThrow();
+  it('handles openExternalUrl safely in web mode', async () => {
+    let openedUrl = '';
+    const mockWindow = {
+      open: (url: string) => {
+        openedUrl = url;
+        return null;
+      },
+    };
+    (globalThis as unknown as { window: unknown }).window = mockWindow;
+
+    try {
+      await openExternalUrl('https://github.com/arjeldru-dev/PostureCheck-');
+      expect(openedUrl).toBe('https://github.com/arjeldru-dev/PostureCheck-');
+    } finally {
+      delete (globalThis as unknown as { window?: unknown }).window;
+    }
   });
 });
+

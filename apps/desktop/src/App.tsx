@@ -5,16 +5,15 @@ import {
   type MascotState,
 } from '@posture-check/shared';
 import DesignSystem from './pages/DesignSystem';
+import Settings from './pages/Settings';
 import RibbitMascot from '@/components/ribbit/RibbitMascot';
 import { useTrayState } from '@/hooks/useTrayState';
 import { useTimer } from '@/hooks/useTimer';
 import { useNotifications } from '@/hooks/useNotifications';
 import {
-  sendTestNotification,
   isTauriEnvironment,
 } from '@/lib/tauri';
 import {
-  Bell,
   Check,
   CheckCircle2,
   Clock,
@@ -33,7 +32,7 @@ import {
 
 export default function App() {
   const { mode, setMode } = useThemeStore();
-  const [currentView, setCurrentView] = useState<'dashboard' | 'design-system'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'settings' | 'design-system'>('dashboard');
   const [feedback, setFeedback] = useState<{ text: string; isError?: boolean } | null>(null);
   const [userXp, setUserXp] = useState<number>(0);
   const isTauri = isTauriEnvironment();
@@ -51,7 +50,6 @@ export default function App() {
     nextReminderAt,
     dndUntil,
     intervalMinutes,
-    status,
     loading: trayLoading,
     error: trayError,
     togglePause,
@@ -62,8 +60,10 @@ export default function App() {
   } = useTrayState({
     onNavigate: (dest) => {
       if (dest === 'settings') {
+        setCurrentView('settings');
         showFeedback('System Tray: Opened settings');
       } else {
+        setCurrentView('dashboard');
         showFeedback('System Tray: Opened dashboard');
       }
     },
@@ -90,7 +90,6 @@ export default function App() {
     activeReminder,
     acknowledge,
     snooze,
-    dismissReminder,
     syncWithBackend: syncTimerWithBackend,
   } = useTimer({
     onReminder: (reminder) => {
@@ -105,7 +104,6 @@ export default function App() {
   const {
     history: notificationHistory,
     testNotification: triggerNotificationLevel,
-    permissionState,
     isPermissionDenied,
     refreshPermission,
     handleAction,
@@ -145,7 +143,7 @@ export default function App() {
 
   const handleTestLevelNotification = async (level: number) => {
     try {
-      const record = await triggerNotificationLevel(level);
+      await triggerNotificationLevel(level);
       setMascotState('reminding');
       const levelName =
         level === 1 ? 'Whisper (Silent)' : level === 2 ? 'Nudge (Toast)' : 'Reminder (Chime)';
@@ -220,17 +218,6 @@ export default function App() {
     }
   };
 
-  const handleTestNotification = async () => {
-    try {
-      await sendTestNotification();
-      setMascotState('encouraging');
-      showFeedback('Test notification sent to operating system!');
-    } catch (err) {
-      console.error('Failed to send test notification:', err);
-      showFeedback('Failed to send notification: permission denied or unsupported', true);
-    }
-  };
-
   const syncAll = async () => {
     await Promise.all([syncTrayWithBackend(), syncTimerWithBackend()]);
   };
@@ -249,8 +236,12 @@ export default function App() {
     return <DesignSystem onBack={() => setCurrentView('dashboard')} />;
   }
 
+  if (currentView === 'settings') {
+    return <Settings onBackToDashboard={() => setCurrentView('dashboard')} />;
+  }
+
   return (
-    <main className="min-h-screen bg-theme-bg text-theme-text p-6 flex flex-col justify-between select-none transition-colors duration-200">
+    <main className="min-h-screen max-h-screen overflow-y-auto bg-theme-bg text-theme-text p-6 flex flex-col justify-between select-none transition-colors duration-200">
       <div className="max-w-4xl w-full mx-auto space-y-6">
         {/* Top App Bar */}
         <header className="flex items-center justify-between border-b border-theme-border pb-4">
@@ -268,12 +259,21 @@ export default function App() {
                 </span>
               </div>
               <p className="text-xs text-theme-muted font-sans">
-                Tauri 2.0 Desktop Core • Step 1.3 Notification System
+                Tauri 2.0 Desktop Core • Step 1.5 Settings Panel
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Settings Panel Switcher */}
+            <button
+              onClick={() => setCurrentView('settings')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-surface border border-theme-border text-theme-text hover:border-frog-green hover:text-frog-green transition-colors"
+              title="Open Settings Panel"
+            >
+              <span>⚙ Settings</span>
+            </button>
+
             {/* Design System Switcher */}
             <button
               onClick={() => setCurrentView('design-system')}
