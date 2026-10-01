@@ -65,16 +65,20 @@ pub fn update_tray_visuals(app: &AppHandle) {
 
     let tooltip = if is_dnd {
         if let Some(until) = dnd_until {
-            format!("Posture Check! — DND until {}", until.format("%-I:%M %p"))
+            format!("😴 Ribbit is sleeping (DND until {})", until.format("%-I:%M %p"))
         } else {
-            "Posture Check! — Do Not Disturb (Silent)".to_string()
+            "😴 Ribbit is sleeping (DND active)".to_string()
         }
     } else if is_paused {
-        "Posture Check! — Reminders Paused 😴".to_string()
+        "⏸ Ribbit is paused".to_string()
     } else if let Some(next) = next_reminder {
-        format!("Posture Check! — Next reminder at {}", next.format("%-I:%M %p"))
+        let now = chrono::Local::now();
+        let remaining_secs = (next - now).num_seconds().max(0);
+        let mins = remaining_secs / 60;
+        let secs = remaining_secs % 60;
+        format!("🐸 Next check in {:02}:{:02} — You're doing great!", mins, secs)
     } else {
-        "Posture Check! — Ribbit is guarding your posture 🐸".to_string()
+        "🐸 Ribbit is watching your posture!".to_string()
     };
 
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
@@ -144,7 +148,7 @@ pub fn create_tray(app: &AppHandle) -> Result<TrayIcon, Box<dyn std::error::Erro
     let tray = TrayIconBuilder::with_id(TRAY_ID)
         .icon(initial_icon)
         .menu(&menu)
-        .tooltip("Posture Check! — Ribbit is guarding your posture 🐸")
+        .tooltip("🐸 Ribbit is watching your posture!")
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| {
             let event_id = event.id.as_ref();

@@ -109,6 +109,11 @@
   --animate-scale-in: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   --animate-bounce: bounce 1s infinite;
   --animate-confetti: confettiFall 2.5s ease-out infinite;
+  --animate-mascot-swap: mascotSwap 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-concerned-wobble: concernedWobble 2.5s ease-in-out infinite;
+  --animate-celebrate-bounce: celebrateBounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) infinite alternate;
+  --animate-pop-in: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  --animate-flame: flameFlicker 1.8s ease-in-out infinite;
 
   @keyframes breathe {
     0%, 100% {
@@ -180,6 +185,60 @@
     100% {
       transform: translateY(100px) rotate(360deg);
       opacity: 0;
+    }
+  }
+
+  @keyframes mascotSwap {
+    0% {
+      opacity: 0.5;
+      transform: scale(0.96);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes concernedWobble {
+    0%, 100% {
+      transform: rotate(0deg);
+    }
+    25% {
+      transform: rotate(-3deg);
+    }
+    75% {
+      transform: rotate(3deg);
+    }
+  }
+
+  @keyframes celebrateBounce {
+    0% {
+      transform: translateY(0);
+    }
+    100% {
+      transform: translateY(-8px) scale(1.02);
+    }
+  }
+
+  @keyframes popIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.9) translateY(6px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  @keyframes flameFlicker {
+    0%, 100% {
+      transform: scale(1) rotate(-1deg);
+      filter: drop-shadow(0 0 4px rgba(255, 112, 67, 0.6));
+    }
+    50% {
+      transform: scale(1.12) rotate(2deg);
+      filter: drop-shadow(0 0 10px rgba(255, 213, 79, 0.9));
     }
   }
 }

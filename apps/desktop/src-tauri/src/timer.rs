@@ -391,6 +391,7 @@ pub fn start_timer_engine(app: AppHandle, notify: Arc<Notify>) {
     // 2. Main async timer engine loop
     tauri::async_runtime::spawn(async move {
         let mut last_tick = Local::now();
+        let mut last_tray_refresh = Local::now();
 
         loop {
             // Sleep for 1 second or wake immediately when notified of state changes
@@ -419,6 +420,12 @@ pub fn start_timer_engine(app: AppHandle, notify: Arc<Notify>) {
                 }
             }
             last_tick = now;
+
+            // Periodically refresh tray tooltip countdown (every 15s) so Windows tray hover has fresh MM:SS
+            if now.signed_duration_since(last_tray_refresh).num_seconds() >= 15 {
+                update_tray_visuals(&app);
+                last_tray_refresh = now;
+            }
 
             // Check timer state and fire if due
             let mut reminder_event = None;

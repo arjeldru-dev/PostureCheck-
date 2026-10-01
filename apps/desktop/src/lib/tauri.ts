@@ -949,3 +949,61 @@ export async function openExternalUrl(url: string): Promise<void> {
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
+
+export interface UserProgressPayload {
+  id: number;
+  totalXp: number;
+  currentLevel: number;
+  currentStreak: number;
+  longestStreak: number;
+  totalChecks: number;
+  streakFreezeAvailable: boolean;
+  lastCheckDate?: string | null;
+  updatedAt: string;
+}
+
+export interface TodayStatsPayload {
+  totalChecksToday: number;
+  acknowledgedToday: number;
+  acknowledgmentRate: number;
+  xpEarnedToday: number;
+}
+
+let mockUserProgress: UserProgressPayload = {
+  id: 1,
+  totalXp: 1250,
+  currentLevel: 6,
+  currentStreak: 5,
+  longestStreak: 12,
+  totalChecks: 42,
+  streakFreezeAvailable: true,
+  lastCheckDate: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+let mockTodayStats: TodayStatsPayload = {
+  totalChecksToday: 8,
+  acknowledgedToday: 7,
+  acknowledgmentRate: 0.875,
+  xpEarnedToday: 70,
+};
+
+/**
+ * Fetch current user gamification progress
+ */
+export async function getProgress(): Promise<UserProgressPayload> {
+  if (isTauriEnvironment()) {
+    return await invoke<UserProgressPayload>('get_progress');
+  }
+  return { ...mockUserProgress };
+}
+
+/**
+ * Fetch today's posture check statistics
+ */
+export async function getTodayStats(): Promise<TodayStatsPayload> {
+  if (isTauriEnvironment()) {
+    return await invoke<TodayStatsPayload>('get_today_stats');
+  }
+  return { ...mockTodayStats };
+}

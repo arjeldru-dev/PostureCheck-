@@ -54,11 +54,17 @@ export const RibbitMascot: React.FC<RibbitMascotProps> = ({
     }
   };
 
+  const stateAnimationClass = (() => {
+    if (state === 'concerned') return 'animate-concerned-wobble';
+    if (state === 'celebrating') return 'animate-celebrate-bounce';
+    return '';
+  })();
+
   return (
     <div
       className={`relative inline-flex items-center justify-center select-none ${
         showBreathing ? 'animate-breathe' : ''
-      } ${
+      } ${stateAnimationClass} ${
         onClick
           ? 'cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-frog-green rounded-xl transition-transform active:scale-95'
           : ''
@@ -75,11 +81,12 @@ export const RibbitMascot: React.FC<RibbitMascotProps> = ({
       aria-label={description}
     >
       <img
+        key={state}
         src={svgSource}
         alt={description}
         width={pixelSize}
         height={pixelSize}
-        className="w-full h-full object-contain pointer-events-none drop-shadow-sm transition-transform duration-300"
+        className="w-full h-full object-contain pointer-events-none drop-shadow-sm transition-transform duration-300 animate-mascot-swap will-change-transform"
         draggable={false}
         loading="eager"
       />
