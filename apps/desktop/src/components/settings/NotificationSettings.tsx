@@ -1,6 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSettingsStore, type NotificationSound } from '@/stores/settingsStore';
-import { Bell, Volume2, ShieldAlert, Sparkles, Smartphone, Check, Loader2 } from 'lucide-react';
+import {
+  Bell,
+  Volume2,
+  ShieldAlert,
+  Sparkles,
+  Smartphone,
+  Check,
+  Loader2,
+  AlertTriangle,
+  X,
+  ShieldCheck,
+} from 'lucide-react';
 import { INTENSITY_CONFIGS, type IntensityLevel } from '@posture-check/shared';
 
 const INTENSITY_ITEMS: Array<{
@@ -46,16 +57,65 @@ export default function NotificationSettings() {
     intensityLevel,
     autoEscalation,
     notificationSound,
+    level5OptIn,
     setIntensityLevel,
     setAutoEscalation,
+    optInLevel5,
     setNotificationSound,
     testNotification,
   } = useSettingsStore();
 
   const [testingLevel, setTestingLevel] = useState<number | null>(null);
   const [testSuccess, setTestSuccess] = useState<string | null>(null);
+  const [showOptInModal, setShowOptInModal] = useState<boolean>(false);
+  const [isConfirmingOptIn, setIsConfirmingOptIn] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!showOptInModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowOptInModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showOptInModal]);
+
+  const handleSelectLevel = (level: number) => {
+    if (level === 5 && !level5OptIn) {
+      setShowOptInModal(true);
+      return;
+    }
+    setIntensityLevel(level);
+  };
+
+  const handleConfirmOptIn = async () => {
+    setIsConfirmingOptIn(true);
+    try {
+      await optInLevel5(true);
+      await setIntensityLevel(5);
+      setShowOptInModal(false);
+      setTestSuccess('Level 5 fullscreen screen-blocking enabled.');
+      setTimeout(() => setTestSuccess(null), 3500);
+    } finally {
+      setIsConfirmingOptIn(false);
+    }
+  };
+
+  const handleRevokeOptIn = async () => {
+    await optInLevel5(false);
+    if (intensityLevel === 5) {
+      await setIntensityLevel(4);
+    }
+    setTestSuccess('Level 5 opt-in revoked. Level set to 4.');
+    setTimeout(() => setTestSuccess(null), 3500);
+  };
 
   const handleTest = async (level: number) => {
+    if (level === 5 && !level5OptIn) {
+      setShowOptInModal(true);
+      return;
+    }
     setTestingLevel(level);
     setTestSuccess(null);
     try {
@@ -120,28 +180,45 @@ export default function NotificationSettings() {
             return (
               <div
                 key={level}
-                onClick={() => setIntensityLevel(level)}
+                onClick={() => handleSelectLevel(level)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && setIntensityLevel(level)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSelectLevel(level)}
                 className={`p-4 rounded-2xl border transition-all text-left flex flex-col justify-between cursor-pointer ${
                   isSelected
-                    ? 'bg-(--color-frog-green)/10 border-(--color-frog-green) shadow-(--shadow-glow-green)'
+                    ? level === 5
+                      ? 'bg-(--color-coral-alert)/10 border-(--color-coral-alert) shadow-[0_0_20px_rgba(255,107,107,0.3)]'
+                      : 'bg-(--color-frog-green)/10 border-(--color-frog-green) shadow-(--shadow-glow-green)'
                     : 'bg-(--color-theme-surface) border-(--color-theme-border) hover:border-(--color-frog-green)/40 hover:bg-(--color-theme-surface)/80'
                 }`}
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-2xl">{emoji}</span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                        isSelected
-                          ? 'bg-(--color-frog-green) text-white'
-                          : 'bg-(--color-theme-border) text-(--color-theme-muted)'
-                      }`}
-                    >
-                      {badge}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {level === 5 && (
+                        <span
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider ${
+                            level5OptIn
+                              ? 'bg-(--color-frog-green)/20 text-(--color-frog-green)'
+                              : 'bg-amber-500/20 text-amber-500'
+                          }`}
+                        >
+                          {level5OptIn ? 'Opted In' : 'Opt-in Req'}
+                        </span>
+                      )}
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                          isSelected
+                            ? level === 5
+                              ? 'bg-(--color-coral-alert) text-white'
+                              : 'bg-(--color-frog-green) text-white'
+                            : 'bg-(--color-theme-border) text-(--color-theme-muted)'
+                        }`}
+                      >
+                        {badge}
+                      </span>
+                    </div>
                   </div>
                   <h4 className="text-sm font-bold font-display text-(--color-theme-text)">
                     {config.name}
@@ -153,16 +230,30 @@ export default function NotificationSettings() {
 
                 <div className="mt-4 pt-3 border-t border-(--color-theme-border)/60 flex items-center justify-between text-[11px] text-(--color-theme-muted)">
                   <span>Audio: {config.audio}</span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleTest(level);
-                    }}
-                    className="text-(--color-frog-green) hover:underline font-medium"
-                  >
-                    Preview
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {level === 5 && level5OptIn && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRevokeOptIn();
+                        }}
+                        className="text-xs text-amber-500 hover:underline font-medium"
+                      >
+                        Revoke
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTest(level);
+                      }}
+                      className="text-(--color-frog-green) hover:underline font-medium"
+                    >
+                      Preview
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -253,6 +344,80 @@ export default function NotificationSettings() {
           customized inside the PostureCheck mobile companion app.
         </span>
       </div>
+
+      {/* Level 5 Confirmation Modal */}
+      {showOptInModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowOptInModal(false)}
+        >
+          <div
+            className="w-full max-w-md bg-(--color-theme-card) border border-(--color-coral-alert)/40 rounded-3xl p-6 shadow-2xl space-y-5 text-(--color-theme-text) relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setShowOptInModal(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-white/10 text-(--color-theme-muted) transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-(--color-coral-alert)/15 border border-(--color-coral-alert)/30 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6 text-(--color-coral-alert)" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-(--color-coral-alert)">
+                  Extreme Intensity Warning
+                </span>
+                <h3 className="text-lg font-bold font-display leading-tight">
+                  Enable Level 5 Fullscreen Mode?
+                </h3>
+              </div>
+            </div>
+
+            <p className="text-sm text-(--color-theme-muted) leading-relaxed">
+              Level 5 will block your entire screen until you acknowledge the reminder. This is the nuclear option. Are you sure?
+            </p>
+
+            <div className="p-3.5 rounded-xl bg-(--color-coral-alert)/10 border border-(--color-coral-alert)/20 text-xs text-(--color-theme-text) leading-relaxed space-y-1">
+              <div className="font-semibold text-(--color-coral-alert) flex items-center gap-1.5">
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+                Interruption Warning
+              </div>
+              <p className="text-(--color-theme-muted)">
+                Note: This may minimize fullscreen games or interrupt presentations. It cannot be dismissed with Alt+F4 and re-focuses automatically if switched away.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowOptInModal(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-(--color-theme-muted) hover:bg-white/5 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmOptIn}
+                disabled={isConfirmingOptIn}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-(--color-coral-alert) text-white hover:bg-(--color-coral-alert)/90 active:scale-95 transition-all shadow-md disabled:opacity-50"
+              >
+                {isConfirmingOptIn ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4" />
+                )}
+                Yes, block my screen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -114,6 +114,30 @@
   --animate-celebrate-bounce: celebrateBounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) infinite alternate;
   --animate-pop-in: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
   --animate-flame: flameFlicker 1.8s ease-in-out infinite;
+  --animate-pulse-green: pulseGreen 2s ease-in-out infinite;
+  --animate-pulse-coral: pulseCoral 1.5s ease-in-out infinite;
+
+  @keyframes pulseGreen {
+    0%, 100% {
+      box-shadow: 0 0 15px rgba(76, 175, 80, 0.4), inset 0 0 10px rgba(76, 175, 80, 0.15);
+      border-color: rgba(76, 175, 80, 0.6);
+    }
+    50% {
+      box-shadow: 0 0 30px rgba(76, 175, 80, 0.8), inset 0 0 18px rgba(76, 175, 80, 0.35);
+      border-color: rgba(76, 175, 80, 1);
+    }
+  }
+
+  @keyframes pulseCoral {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(255, 112, 67, 0.4);
+      border-color: rgba(255, 112, 67, 0.6);
+    }
+    50% {
+      box-shadow: 0 0 45px rgba(255, 112, 67, 0.85);
+      border-color: rgba(255, 112, 67, 1);
+    }
+  }
 
   @keyframes breathe {
     0%, 100% {

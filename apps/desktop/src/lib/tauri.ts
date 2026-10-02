@@ -630,6 +630,7 @@ export interface PostureSettingsPayload {
   autoEscalation: boolean;
   dndEnabled: boolean;
   isActiveProfile: boolean;
+  level5OptIn?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -646,6 +647,43 @@ export interface SaveSettingsPayload {
   autoEscalation?: boolean;
   dndEnabled?: boolean;
   isActiveProfile?: boolean;
+  level5OptIn?: boolean;
+}
+
+/**
+ * Close any open overlay/fullscreen windows and stop alarm audio
+ */
+export async function closeOverlay(): Promise<void> {
+  if (isTauriEnvironment()) {
+    await invoke('close_overlay');
+  }
+}
+
+/**
+ * Re-focus fullscreen overlay if blurred
+ */
+export async function refocusFullscreenOverlay(): Promise<void> {
+  if (isTauriEnvironment()) {
+    await invoke('refocus_fullscreen_overlay');
+  }
+}
+
+/**
+ * Play alarm sound for a given intensity level
+ */
+export async function playAlarmSound(level: number): Promise<void> {
+  if (isTauriEnvironment()) {
+    await invoke('play_alarm_sound', { level });
+  }
+}
+
+/**
+ * Stop alarm sound immediately
+ */
+export async function stopAlarmSound(): Promise<void> {
+  if (isTauriEnvironment()) {
+    await invoke('stop_alarm_sound');
+  }
 }
 
 export interface PersistedAppStatePayload {

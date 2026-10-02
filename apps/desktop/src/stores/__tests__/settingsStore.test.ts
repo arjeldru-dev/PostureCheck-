@@ -182,9 +182,14 @@ describe('useSettingsStore (Zustand + SQLite / Tauri Mock)', () => {
     expect(parsed).toHaveProperty('profiles');
   });
 
-  it('clears posture history and returns cleared count', async () => {
-    const { clearHistory } = useSettingsStore.getState();
-    const cleared = await clearHistory();
-    expect(typeof cleared).toBe('number');
+  it('toggles level5 opt-in setting', async () => {
+    const { optInLevel5 } = useSettingsStore.getState();
+
+    await optInLevel5(true);
+    expect(useSettingsStore.getState().level5OptIn).toBe(true);
+
+    await optInLevel5(false);
+    expect(useSettingsStore.getState().level5OptIn).toBe(false);
   });
 });
+

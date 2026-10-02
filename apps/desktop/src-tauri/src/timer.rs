@@ -56,6 +56,7 @@ pub struct PostureTimer {
     pub active_hours_end: NaiveTime,
     pub active_days: Vec<Weekday>,
     pub escalation_enabled: bool,
+    pub base_intensity_level: u8,
     pub current_escalation_level: u8,
     pub max_escalation_level: u8,
     pub last_acknowledged_at: Option<DateTime<Local>>,
@@ -93,8 +94,9 @@ impl PostureTimer {
             active_hours_end: end_time,
             active_days: all_days,
             escalation_enabled: true,
-            current_escalation_level: 1,
-            max_escalation_level: 3,
+            base_intensity_level: 2,
+            current_escalation_level: 2,
+            max_escalation_level: 5,
             last_acknowledged_at: None,
             last_fired_at: None,
             suspended_at: None,
@@ -240,6 +242,13 @@ impl PostureTimer {
         }
     }
 
+    /// Update base intensity level and sync current escalation level
+    pub fn set_intensity_level(&mut self, level: u8) {
+        let clamped = level.clamp(1, 5);
+        self.base_intensity_level = clamped;
+        self.current_escalation_level = clamped;
+    }
+
     /// Snooze the current reminder by X minutes
     pub fn snooze(&mut self, minutes: u32) {
         let snooze_duration = Duration::minutes(minutes.max(1) as i64);
@@ -250,7 +259,7 @@ impl PostureTimer {
     pub fn acknowledge(&mut self) -> AcknowledgePayload {
         let now = Local::now();
         self.last_acknowledged_at = Some(now);
-        self.current_escalation_level = 1;
+        self.current_escalation_level = self.base_intensity_level;
         self.last_fired_at = None;
 
         if self.is_running {
@@ -285,6 +294,8 @@ impl PostureTimer {
                     }
                 }
             }
+        } else {
+            self.current_escalation_level = self.base_intensity_level;
         }
 
         self.last_fired_at = Some(now);
@@ -634,7 +645,9 @@ mod tests {
         assert_eq!(timer.interval_minutes, 30);
         assert!(timer.is_running);
         assert!(timer.next_fire_at.is_some());
-        assert_eq!(timer.current_escalation_level, 1);
+        assert_eq!(timer.base_intensity_level, 2);
+        assert_eq!(timer.current_escalation_level, 2);
+        assert_eq!(timer.max_escalation_level, 5);
         assert_eq!(timer.active_days.len(), 7);
         assert_eq!(timer.active_hours_start, NaiveTime::from_hms_opt(8, 0, 0).unwrap());
         assert_eq!(timer.active_hours_end, NaiveTime::from_hms_opt(22, 0, 0).unwrap());
@@ -697,13 +710,14 @@ mod tests {
     #[test]
     fn test_snooze_and_acknowledge() {
         let mut timer = PostureTimer::new(30);
+        timer.set_intensity_level(1);
         let before_snooze = Local::now();
         timer.snooze(15);
         let next = timer.next_fire_at.unwrap();
         let diff = (next - before_snooze).num_minutes();
         assert!(diff >= 14 && diff <= 16);
 
-        // Acknowledge resets escalation to 1
+        // Acknowledge resets escalation to base level (1)
         timer.current_escalation_level = 3;
         let ack = timer.acknowledge();
         assert!(ack.success);
@@ -713,8 +727,31 @@ mod tests {
     }
 
     #[test]
+    fn test_intensity_level_configuration_and_reset() {
+        let mut timer = PostureTimer::new(30);
+        // Default base is 2
+        assert_eq!(timer.base_intensity_level, 2);
+        assert_eq!(timer.current_escalation_level, 2);
+
+        // Change base intensity to Level 4
+        timer.set_intensity_level(4);
+        assert_eq!(timer.base_intensity_level, 4);
+        assert_eq!(timer.current_escalation_level, 4);
+
+        // Timer fire produces Level 4
+        let event = timer.trigger_fire(Local::now());
+        assert_eq!(event.level, 4);
+
+        // Acknowledge resets back to base intensity (Level 4, not 1!)
+        let ack = timer.acknowledge();
+        assert_eq!(ack.current_escalation_level, 4);
+        assert_eq!(timer.current_escalation_level, 4);
+    }
+
+    #[test]
     fn test_auto_escalation_logic() {
         let mut timer = PostureTimer::new(30);
+        timer.set_intensity_level(1);
         timer.escalation_enabled = true;
         timer.max_escalation_level = 3;
 
@@ -745,7 +782,7 @@ mod tests {
         let event5 = timer.trigger_fire(t4);
         assert_eq!(event5.level, 3);
 
-        // User acknowledges -> resets to level 1
+        // User acknowledges -> resets to base level (1)
         timer.acknowledge();
         assert_eq!(timer.current_escalation_level, 1);
     }

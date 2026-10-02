@@ -36,6 +36,7 @@ export interface QuickProfile {
   routingMode: 'pc_only' | 'phone_only' | 'both';
   autoEscalation: boolean;
   dndEnabled: boolean;
+  level5OptIn: boolean;
   isActiveProfile: boolean;
 }
 
@@ -53,6 +54,7 @@ export interface SettingsStoreState {
   routingMode: 'pc_only' | 'phone_only' | 'both';
   autoEscalation: boolean;
   dndEnabled: boolean;
+  level5OptIn: boolean;
   isActiveProfile: boolean;
 
   // Profiles list
@@ -81,6 +83,7 @@ export interface SettingsStoreState {
   setActiveDays: (days: number[]) => Promise<void>;
   setRoutingMode: (mode: 'pc_only' | 'phone_only' | 'both') => Promise<void>;
   setAutoEscalation: (enabled: boolean) => Promise<void>;
+  optInLevel5: (optIn: boolean) => Promise<void>;
   setDnd: (enabled: boolean, durationMinutes?: number | null) => Promise<void>;
   setLaunchOnStartup: (enabled: boolean) => Promise<void>;
   setThemeMode: (mode: ThemeMode) => Promise<void>;
@@ -126,6 +129,7 @@ function mapPayloadToProfile(payload: PostureSettingsPayload): QuickProfile {
     routingMode: payload.routingMode || 'pc_only',
     autoEscalation: !!payload.autoEscalation,
     dndEnabled: !!payload.dndEnabled,
+    level5OptIn: !!payload.level5OptIn,
     isActiveProfile: !!payload.isActiveProfile,
   };
 }
@@ -141,6 +145,7 @@ export const useSettingsStore = create<SettingsStoreState>((set) => ({
   routingMode: 'pc_only',
   autoEscalation: false,
   dndEnabled: false,
+  level5OptIn: false,
   isActiveProfile: true,
 
   profiles: [],
@@ -294,6 +299,16 @@ export const useSettingsStore = create<SettingsStoreState>((set) => ({
     }
   },
 
+  optInLevel5: async (optIn: boolean) => {
+    set({ level5OptIn: optIn });
+
+    try {
+      await tauriSaveSettings({ level5OptIn: optIn });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) });
+    }
+  },
+
   setDnd: async (enabled: boolean, durationMinutes?: number | null) => {
     set({ dndEnabled: enabled });
 
@@ -396,6 +411,7 @@ export const useSettingsStore = create<SettingsStoreState>((set) => ({
         activeDays: formatDaysString(profileData.activeDays ?? [1, 2, 3, 4, 5, 6, 7]),
         routingMode: profileData.routingMode ?? 'pc_only',
         autoEscalation: profileData.autoEscalation ?? false,
+        level5OptIn: profileData.level5OptIn ?? false,
         dndEnabled: false,
         isActiveProfile: false,
       };
@@ -428,6 +444,7 @@ export const useSettingsStore = create<SettingsStoreState>((set) => ({
         activeDays: updates.activeDays ? formatDaysString(updates.activeDays) : undefined,
         routingMode: updates.routingMode,
         autoEscalation: updates.autoEscalation,
+        level5OptIn: updates.level5OptIn,
       };
 
       await tauriSaveSettings(payload);

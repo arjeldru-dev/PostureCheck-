@@ -1,3 +1,4 @@
+pub mod audio;
 pub mod database;
 pub mod notifications;
 pub mod state;
@@ -357,17 +358,28 @@ fn set_escalation_settings(
     Ok(timer_payload)
 }
 
-/// Command: Set default notification intensity level (1..=5, validated to 1..=3 for Phase 1)
+/// Command: Set default notification intensity level (1..=5)
 #[tauri::command]
 fn set_intensity_level(
     level: u8,
+    app: tauri::AppHandle,
+    state: State<'_, Mutex<AppState>>,
     mgr: State<'_, Mutex<NotificationManager>>,
 ) -> Result<u8, String> {
     if !(1..=5).contains(&level) {
         return Err("Intensity level must be between 1 and 5".to_string());
     }
-    let mut lock = mgr.lock().map_err(|e| e.to_string())?;
-    lock.default_intensity_level = level;
+    {
+        let mut lock = mgr.lock().map_err(|e| e.to_string())?;
+        lock.default_intensity_level = level;
+    }
+    let (timer_payload, tray_payload) = {
+        let mut app_state = state.lock().map_err(|e| e.to_string())?;
+        app_state.timer.set_intensity_level(level);
+        (app_state.to_timer_payload(), app_state.to_tray_payload())
+    };
+    let _ = app.emit("timer-state-changed", &timer_payload);
+    let _ = app.emit("tray-state-changed", &tray_payload);
     Ok(level)
 }
 
@@ -405,7 +417,7 @@ fn show_posture_notification(
         .and_then(|n| n.intensity_level)
         .or(level)
         .unwrap_or(2)
-        .clamp(1, 3);
+        .clamp(1, 5);
     let msg = notification
         .as_ref()
         .and_then(|n| n.body.clone())
@@ -413,14 +425,42 @@ fn show_posture_notification(
     core_show_posture_notification(&app, lvl, msg)
 }
 
-/// Command: Send a test notification at specified intensity level (1..=3)
+/// Command: Send a test notification at specified intensity level (1..=5)
 #[tauri::command]
 fn test_notification(
     level: u8,
     app: tauri::AppHandle,
 ) -> Result<NotificationRecord, String> {
-    let clamped_level = level.clamp(1, 3);
+    let clamped_level = level.clamp(1, 5);
     core_show_posture_notification(&app, clamped_level, None)
+}
+
+/// Command: Close any open overlay/fullscreen windows and stop alarm audio
+#[tauri::command]
+fn close_overlay(app: tauri::AppHandle) -> Result<(), String> {
+    notifications::close_overlay_windows(&app);
+    Ok(())
+}
+
+/// Command: Re-focus fullscreen overlay if blurred
+#[tauri::command]
+fn refocus_fullscreen_overlay(app: tauri::AppHandle) -> Result<(), String> {
+    notifications::refocus_fullscreen_overlay(&app);
+    Ok(())
+}
+
+/// Command: Play alarm sound for a given intensity level
+#[tauri::command]
+fn play_alarm_sound(level: u8, app: tauri::AppHandle) -> Result<(), String> {
+    notifications::play_alarm_sound(&app, level);
+    Ok(())
+}
+
+/// Command: Stop alarm sound immediately
+#[tauri::command]
+fn stop_alarm_sound(app: tauri::AppHandle) -> Result<(), String> {
+    notifications::stop_alarm_sound(&app);
+    Ok(())
 }
 
 /// Command: Send a native test notification to verify OS capabilities
@@ -569,6 +609,7 @@ fn save_settings(
     let (tray_payload, timer_payload, app_payload) = {
         let mut app_state = state.lock().map_err(|e| e.to_string())?;
         app_state.timer.set_interval(saved.interval_minutes);
+        app_state.timer.set_intensity_level(saved.intensity_level);
         app_state.timer.escalation_enabled = saved.auto_escalation;
 
         if let Ok(start) = NaiveTime::parse_from_str(&saved.active_hours_start, "%H:%M") {
@@ -675,6 +716,7 @@ fn switch_profile(
     let (tray_payload, timer_payload, app_payload) = {
         let mut app_state = state.lock().map_err(|e| e.to_string())?;
         app_state.timer.set_interval(saved.interval_minutes);
+        app_state.timer.set_intensity_level(saved.intensity_level);
         app_state.timer.escalation_enabled = saved.auto_escalation;
 
         if let Ok(start) = NaiveTime::parse_from_str(&saved.active_hours_start, "%H:%M") {
@@ -838,6 +880,8 @@ fn open_external_url(url: String) -> Result<(), String> {
 pub fn run() {
     let notify = Arc::new(Notify::new());
 
+    let audio_mgr = Arc::new(audio::AudioManager::new());
+
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
@@ -845,6 +889,7 @@ pub fn run() {
         .manage(Mutex::new(AppState::new()))
         .manage(Mutex::new(NotificationManager::new()))
         .manage(TimerNotifier(notify.clone()))
+        .manage(audio_mgr)
         .invoke_handler(tauri::generate_handler![
             get_tray_state,
             toggle_pause,
@@ -880,7 +925,11 @@ pub fn run() {
             clear_posture_history,
             export_posture_data,
             set_launch_on_startup,
-            open_external_url
+            open_external_url,
+            close_overlay,
+            refocus_fullscreen_overlay,
+            play_alarm_sound,
+            stop_alarm_sound
         ])
         .setup(move |app| {
             // 1. Initialize SQLite Database and run migrations
@@ -894,6 +943,7 @@ pub fn run() {
                 if let Ok(mut state) = app.state::<Mutex<AppState>>().lock() {
                     state.interval_minutes = settings.interval_minutes;
                     state.timer.interval_minutes = settings.interval_minutes;
+                    state.timer.set_intensity_level(settings.intensity_level);
                     state.timer.escalation_enabled = settings.auto_escalation;
 
                     if let Ok(start) = NaiveTime::parse_from_str(&settings.active_hours_start, "%H:%M") {
@@ -985,10 +1035,29 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                // Prevent app from quitting on window close, hide to tray instead
-                api.prevent_close();
-                let _ = window.hide();
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    api.prevent_close();
+                    if window.label() == "notification-fullscreen" {
+                        // Level 5 fullscreen overlay blocks closing until acknowledged
+                    } else if window.label() == "notification-overlay" {
+                        notifications::dismiss_active_notification(&window.app_handle());
+                    } else {
+                        // Prevent app from quitting on main window close, hide to tray instead
+                        let _ = window.hide();
+                    }
+                }
+                WindowEvent::Focused(false) => {
+                    if window.label() == "notification-fullscreen" && window.is_visible().unwrap_or(false) {
+                        let win_clone = window.clone();
+                        tauri::async_runtime::spawn(async move {
+                            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                            let _ = win_clone.set_always_on_top(true);
+                            let _ = win_clone.set_focus();
+                        });
+                    }
+                }
+                _ => {}
             }
         })
         .run(tauri::generate_context!())

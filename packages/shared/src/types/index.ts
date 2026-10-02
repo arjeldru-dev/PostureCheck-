@@ -62,6 +62,7 @@ export interface PostureSettings {
   routing_mode: RoutingMode;
   auto_escalation: boolean;
   dnd_enabled: boolean;
+  level5_opt_in?: boolean;
   is_active_profile: boolean;
   created_at: string;
   updated_at: string;

@@ -20,6 +20,36 @@
         "minHeight": 400,
         "resizable": true,
         "visible": false
+      },
+      {
+        "label": "notification-overlay",
+        "title": "Posture Check! Alert",
+        "url": "overlay.html",
+        "width": 500,
+        "height": 300,
+        "minWidth": 500,
+        "minHeight": 300,
+        "maxWidth": 500,
+        "maxHeight": 300,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "transparent": true,
+        "center": true,
+        "visible": false,
+        "skipTaskbar": true
+      },
+      {
+        "label": "notification-fullscreen",
+        "title": "Posture Check! Wake Up",
+        "url": "fullscreen.html",
+        "fullscreen": true,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "transparent": true,
+        "visible": false,
+        "skipTaskbar": true
       }
     ],
     "trayIcon": {

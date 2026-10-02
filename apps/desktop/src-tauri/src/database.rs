@@ -20,6 +20,7 @@ pub struct PostureSettings {
     pub is_active_profile: bool,
     pub created_at: String,
     pub updated_at: String,
+    pub level5_opt_in: bool,
 }
 
 impl Default for PostureSettings {
@@ -38,6 +39,7 @@ impl Default for PostureSettings {
             is_active_profile: true,
             created_at: Utc::now().to_rfc3339(),
             updated_at: Utc::now().to_rfc3339(),
+            level5_opt_in: false,
         }
     }
 }
@@ -66,6 +68,8 @@ pub struct SaveSettingsInput {
     pub dnd_enabled: Option<bool>,
     #[serde(alias = "is_active_profile")]
     pub is_active_profile: Option<bool>,
+    #[serde(alias = "level5_opt_in")]
+    pub level5_opt_in: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -217,7 +221,7 @@ impl Database {
                 "SELECT id, profile_name, interval_minutes, intensity_level,
                         active_hours_start, active_hours_end, active_days,
                         routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                        created_at, updated_at
+                        created_at, updated_at, level5_opt_in
                  FROM posture_settings
                  WHERE is_active_profile = 1
                  ORDER BY created_at ASC
@@ -241,6 +245,7 @@ impl Database {
                     is_active_profile: row.get::<_, i64>(10)? != 0,
                     created_at: row.get(11)?,
                     updated_at: row.get(12)?,
+                    level5_opt_in: row.get::<_, Option<i64>>(13).unwrap_or(Some(0)).unwrap_or(0) != 0,
                 })
             })
             .optional()
@@ -262,7 +267,7 @@ impl Database {
                         "SELECT id, profile_name, interval_minutes, intensity_level,
                                 active_hours_start, active_hours_end, active_days,
                                 routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                                created_at, updated_at
+                                created_at, updated_at, level5_opt_in
                          FROM posture_settings
                          WHERE id = ?1",
                     )
@@ -284,6 +289,7 @@ impl Database {
                             is_active_profile: row.get::<_, i64>(10)? != 0,
                             created_at: row.get(11)?,
                             updated_at: row.get(12)?,
+                            level5_opt_in: row.get::<_, Option<i64>>(13).unwrap_or(Some(0)).unwrap_or(0) != 0,
                         })
                     })
                     .optional()
@@ -295,7 +301,7 @@ impl Database {
                         "SELECT id, profile_name, interval_minutes, intensity_level,
                                 active_hours_start, active_hours_end, active_days,
                                 routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                                created_at, updated_at
+                                created_at, updated_at, level5_opt_in
                          FROM posture_settings
                          WHERE is_active_profile = 1
                          ORDER BY created_at ASC
@@ -319,6 +325,7 @@ impl Database {
                             is_active_profile: row.get::<_, i64>(10)? != 0,
                             created_at: row.get(11)?,
                             updated_at: row.get(12)?,
+                            level5_opt_in: row.get::<_, Option<i64>>(13).unwrap_or(Some(0)).unwrap_or(0) != 0,
                         })
                     })
                     .optional()
@@ -354,6 +361,9 @@ impl Database {
         if let Some(dnd) = input.dnd_enabled {
             current.dnd_enabled = dnd;
         }
+        if let Some(opt_in) = input.level5_opt_in {
+            current.level5_opt_in = opt_in;
+        }
         current.updated_at = now_utc;
 
         tx.execute(
@@ -361,8 +371,8 @@ impl Database {
                 id, profile_name, interval_minutes, intensity_level,
                 active_hours_start, active_hours_end, active_days,
                 routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+                created_at, updated_at, level5_opt_in
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
             ON CONFLICT(id) DO UPDATE SET
                 profile_name = excluded.profile_name,
                 interval_minutes = excluded.interval_minutes,
@@ -374,7 +384,8 @@ impl Database {
                 auto_escalation = excluded.auto_escalation,
                 dnd_enabled = excluded.dnd_enabled,
                 is_active_profile = excluded.is_active_profile,
-                updated_at = excluded.updated_at;",
+                updated_at = excluded.updated_at,
+                level5_opt_in = excluded.level5_opt_in;",
             params![
                 current.id,
                 current.profile_name,
@@ -389,6 +400,7 @@ impl Database {
                 if current.is_active_profile { 1 } else { 0 },
                 current.created_at,
                 current.updated_at,
+                if current.level5_opt_in { 1 } else { 0 },
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -903,7 +915,7 @@ impl Database {
                 "SELECT id, profile_name, interval_minutes, intensity_level,
                         active_hours_start, active_hours_end, active_days,
                         routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                        created_at, updated_at
+                        created_at, updated_at, level5_opt_in
                  FROM posture_settings
                  ORDER BY created_at ASC",
             )
@@ -925,6 +937,7 @@ impl Database {
                     is_active_profile: row.get::<_, i64>(10)? != 0,
                     created_at: row.get(11)?,
                     updated_at: row.get(12)?,
+                    level5_opt_in: row.get::<_, Option<i64>>(13).unwrap_or(Some(0)).unwrap_or(0) != 0,
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -961,7 +974,7 @@ impl Database {
                 "SELECT id, profile_name, interval_minutes, intensity_level,
                         active_hours_start, active_hours_end, active_days,
                         routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                        created_at, updated_at
+                        created_at, updated_at, level5_opt_in
                  FROM posture_settings
                  WHERE id = ?1",
             )
@@ -983,6 +996,7 @@ impl Database {
                     is_active_profile: row.get::<_, i64>(10)? != 0,
                     created_at: row.get(11)?,
                     updated_at: row.get(12)?,
+                    level5_opt_in: row.get::<_, Option<i64>>(13).unwrap_or(Some(0)).unwrap_or(0) != 0,
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -1006,6 +1020,7 @@ impl Database {
         let auto_escalation = input.auto_escalation.unwrap_or(false);
         let dnd_enabled = input.dnd_enabled.unwrap_or(false);
         let make_active = input.is_active_profile.unwrap_or(false);
+        let level5_opt_in = input.level5_opt_in.unwrap_or(false);
 
         let mut conn = self.conn.lock().map_err(|e| e.to_string())?;
         let tx = conn.transaction().map_err(|e| e.to_string())?;
@@ -1029,6 +1044,7 @@ impl Database {
             is_active_profile: make_active,
             created_at: now_utc.clone(),
             updated_at: now_utc.clone(),
+            level5_opt_in,
         };
 
         tx.execute(
@@ -1036,8 +1052,8 @@ impl Database {
                 id, profile_name, interval_minutes, intensity_level,
                 active_hours_start, active_hours_end, active_days,
                 routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                created_at, updated_at, level5_opt_in
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             params![
                 profile.id,
                 profile.profile_name,
@@ -1052,6 +1068,7 @@ impl Database {
                 if profile.is_active_profile { 1 } else { 0 },
                 profile.created_at,
                 profile.updated_at,
+                if profile.level5_opt_in { 1 } else { 0 },
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -1208,6 +1225,18 @@ pub fn apply_migrations(conn: &Connection) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     }
 
+    // 005_add_level5_opt_in
+    if !applied_versions.contains(&5) {
+        let sql_005 = include_str!("../migrations/005_add_level5_opt_in.sql");
+        conn.execute_batch(sql_005)
+            .map_err(|e| format!("Migration 005_add_level5_opt_in failed: {}", e))?;
+        conn.execute(
+            "INSERT INTO _migrations (version, description) VALUES (5, 'add_level5_opt_in')",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
     Ok(())
 }
 
@@ -1270,6 +1299,30 @@ mod tests {
         assert!(!settings.auto_escalation);
         assert!(!settings.dnd_enabled);
         assert!(settings.is_active_profile);
+        assert!(!settings.level5_opt_in);
+    }
+
+    #[test]
+    fn test_level5_opt_in_persistence() {
+        let db = init_test_database();
+        let initial = db.get_settings().expect("get initial settings");
+        assert!(!initial.level5_opt_in);
+
+        // Explicitly opt in to Level 5
+        let updated = db
+            .save_settings(SaveSettingsInput {
+                level5_opt_in: Some(true),
+                intensity_level: Some(5),
+                ..Default::default()
+            })
+            .expect("save opt in");
+        assert!(updated.level5_opt_in);
+        assert_eq!(updated.intensity_level, 5);
+
+        // Fetch back and verify persistence
+        let refreshed = db.get_settings().expect("refreshed settings");
+        assert!(refreshed.level5_opt_in);
+        assert_eq!(refreshed.intensity_level, 5);
     }
 
     #[test]
