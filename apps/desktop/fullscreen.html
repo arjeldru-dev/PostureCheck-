@@ -11,6 +11,17 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
+    <script>
+      (function() {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var mode = params.get('theme') || localStorage.getItem('posture-check-theme') || 'dark';
+          var isDark = mode === 'dark' || (mode === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+          document.documentElement.className = isDark ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body class="bg-transparent text-theme-text antialiased select-none font-sans overflow-hidden m-0 p-0">
     <div id="root"></div>

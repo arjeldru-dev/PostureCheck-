@@ -23,7 +23,16 @@ import {
   Activity,
   ArrowLeft,
   Smile,
+  Bell,
+  ShieldAlert,
+  AlertOctagon,
+  Volume2,
 } from 'lucide-react';
+import {
+  WhisperNotification,
+  NudgeNotification,
+  ReminderNotification,
+} from '../components/notifications';
 
 interface DesignSystemProps {
   onBack?: () => void;
@@ -123,7 +132,7 @@ function ColorCard({
 
 export default function DesignSystem({ onBack }: DesignSystemProps) {
   const { mode, resolvedMode, setMode } = useThemeStore();
-  const [activeTab, setActiveTab] = useState<'colors' | 'typography' | 'spacing' | 'surfaces' | 'animations' | 'mascot'>('colors');
+  const [activeTab, setActiveTab] = useState<'colors' | 'typography' | 'spacing' | 'surfaces' | 'animations' | 'mascot' | 'notifications'>('colors');
   const [previewSize, setPreviewSize] = useState<'sm' | 'md' | 'lg' | 'xl'>('md');
   const [previewBreathing, setPreviewBreathing] = useState(true);
 
@@ -195,6 +204,7 @@ export default function DesignSystem({ onBack }: DesignSystemProps) {
               { id: 'surfaces', label: 'Surfaces & Shadows', icon: Layers },
               { id: 'animations', label: 'Micro-Animations', icon: Activity },
               { id: 'mascot', label: 'Ribbit Mascot', icon: Smile },
+              { id: 'notifications', label: 'Notification UI', icon: Bell },
             ] as const
           ).map(({ id, label, icon: Icon }) => (
             <button
@@ -728,6 +738,230 @@ export default function DesignSystem({ onBack }: DesignSystemProps) {
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+        )}
+
+        {/* 7. NOTIFICATION UI TAB */}
+        {activeTab === 'notifications' && (
+          <section className="space-y-8 animate-fade-in">
+            <div>
+              <h2 className="text-lg font-display font-bold text-theme-text mb-1">
+                Notification UI Suite (Intensity Levels 1–5)
+              </h2>
+              <p className="text-xs text-theme-muted">
+                Mascot-driven, progressive notification designs calibrated for visual hierarchy, contrast, and responsive animations.
+              </p>
+            </div>
+
+            {/* Level 1: Whisper */}
+            <div className="p-6 rounded-2xl bg-theme-surface border border-theme-border space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-frog-green/15 text-frog-green">
+                      Level 1
+                    </span>
+                    <h3 className="font-display font-bold text-sm text-theme-text">Whisper Notification</h3>
+                  </div>
+                  <p className="text-xs text-theme-muted mt-1">
+                    Subtle, tooltip-style toast near system tray. Small 32px Ribbit, quiet text, auto-dismisses in 10s.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-6 bg-theme-bg/60 rounded-xl border border-theme-border/50 flex items-center justify-center min-h-[100px]">
+                <WhisperNotification
+                  message="Psst... gentle posture check. You've been coding for 30 minutes! 🐸"
+                  ribbitState="encouraging"
+                  position="inline"
+                  className="max-w-sm"
+                  autoDismissSeconds={0}
+                />
+              </div>
+            </div>
+
+            {/* Level 2: Nudge */}
+            <div className="p-6 rounded-2xl bg-theme-surface border border-theme-border space-y-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-lily-pad/20 text-lily-pad">
+                    Level 2 · Default
+                  </span>
+                  <h3 className="font-display font-bold text-sm text-theme-text">Nudge Toast Notification</h3>
+                </div>
+                <p className="text-xs text-theme-muted mt-1">
+                  Standard 360px toast with lily-pad green left border, 48px waving Ribbit, and action buttons.
+                </p>
+              </div>
+
+              <div className="p-6 bg-theme-bg/60 rounded-xl border border-theme-border/50 flex items-center justify-center min-h-[140px]">
+                <NudgeNotification
+                  title="Posture Check!"
+                  message="Time to lift your chest, roll your shoulders back, and take a deep breath."
+                  ribbitState="encouraging"
+                  position="inline"
+                  autoDismissSeconds={0}
+                />
+              </div>
+            </div>
+
+            {/* Level 3: Reminder */}
+            <div className="p-6 rounded-2xl bg-theme-surface border border-theme-border space-y-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-frog-green/20 text-frog-green">
+                    Level 3
+                  </span>
+                  <h3 className="font-display font-bold text-sm text-theme-text">Reminder Banner</h3>
+                </div>
+                <p className="text-xs text-theme-muted mt-1">
+                  Prominent 420px banner with subtle frog-green gradient, gentle pulsing border glow, 64px mascot tapping screen pose, stays until acknowledged.
+                </p>
+              </div>
+
+              <div className="p-6 bg-theme-bg/60 rounded-xl border border-theme-border/50 flex items-center justify-center min-h-[180px]">
+                <ReminderNotification
+                  title="Posture Check Reminder"
+                  message="Don't slouch into the desk! Un-hunch your back and claim your +10 XP!"
+                  ribbitState="reminding"
+                  position="inline"
+                />
+              </div>
+            </div>
+
+            {/* Level 4: Alert Overlay Preview */}
+            <div className="p-6 rounded-2xl bg-theme-surface border border-theme-border space-y-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-coral-alert/20 text-coral-alert">
+                    Level 4
+                  </span>
+                  <h3 className="font-display font-bold text-sm text-theme-text">Alert Overlay (500×300px)</h3>
+                </div>
+                <p className="text-xs text-theme-muted mt-1">
+                  Coral-alert gradient card with pulsing border, 120px Ribbit, live sound wave visualizer, and press micro-animations.
+                </p>
+              </div>
+
+              <div className="p-6 bg-theme-bg/60 rounded-xl border border-theme-border/50 flex items-center justify-center">
+                <div className="w-[500px] h-[300px] rounded-3xl bg-gradient-to-br from-coral-alert/20 via-surface-dark/95 to-pond-dark/98 dark:from-coral-alert/20 dark:via-surface-dark/95 dark:to-pond-dark/98 light:from-coral-alert/15 light:via-white/95 light:to-slate-100/98 backdrop-blur-2xl border-2 border-coral-alert p-5 flex flex-col justify-between shadow-2xl animate-pulse-coral relative overflow-hidden select-none">
+                  {/* Decorative coral halo */}
+                  <div className="absolute -top-12 -right-12 w-36 h-36 bg-coral-alert/20 rounded-full blur-2xl pointer-events-none" />
+
+                  {/* Header Row */}
+                  <div className="flex items-center justify-between z-10">
+                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-coral-alert/20 border border-coral-alert/40 text-coral-alert">
+                      <ShieldAlert className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span className="text-[11px] font-display font-bold uppercase tracking-wider">
+                        Level 4 · Urgent Alert
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
+                      <Volume2 className="w-3.5 h-3.5 text-coral-alert animate-pulse" />
+                      <div className="flex items-end gap-0.5 h-3.5 w-7">
+                        <span className="w-1 bg-coral-alert rounded-full animate-sound-wave-1 h-2" />
+                        <span className="w-1 bg-coral-alert rounded-full animate-sound-wave-2 h-3.5" />
+                        <span className="w-1 bg-coral-alert rounded-full animate-sound-wave-3 h-1.5" />
+                        <span className="w-1 bg-coral-alert rounded-full animate-sound-wave-1 h-3" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mascot & Body */}
+                  <div className="flex items-center gap-4 z-10 my-auto py-1">
+                    <div className="shrink-0 flex items-center justify-center pl-1">
+                      <RibbitMascot state="concerned" size={120} showBreathing={true} />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-1">
+                      <h2 className="font-display font-black text-xl text-coral-alert tracking-tight mb-1">
+                        ⏰ Posture Alert!
+                      </h2>
+                      <p className="font-sans text-[13.5px] leading-snug font-medium text-text-primary-dark dark:text-text-primary-dark light:text-slate-800 line-clamp-3">
+                        ATTENTION: Serious slouch alert! Straighten your spine and back away from the desk!
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-3 pt-2 z-10 border-t border-white/10">
+                    <button
+                      type="button"
+                      className="flex-1 py-2.5 px-4 rounded-xl bg-frog-green text-white font-display font-bold text-xs tracking-wider shadow-md shadow-frog-green/35 flex items-center justify-center gap-2 cursor-pointer active:scale-97 transition-transform"
+                    >
+                      <Check className="w-4 h-4 stroke-[3]" />
+                      <span>✓ I'm sitting up!</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-text-muted-dark font-display font-semibold text-xs tracking-wide flex items-center justify-center gap-1.5 cursor-pointer active:scale-97 transition-transform"
+                    >
+                      <Moon className="w-3.5 h-3.5" />
+                      <span>💤 Snooze 5 min</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Level 5: Fullscreen Wake Up Preview */}
+            <div className="p-6 rounded-2xl bg-theme-surface border border-theme-border space-y-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-coral-alert/30 text-coral-alert">
+                    Level 5 · Maximum Alert
+                  </span>
+                  <h3 className="font-display font-bold text-sm text-theme-text">Wake Up! Fullscreen Overlay</h3>
+                </div>
+                <p className="text-xs text-theme-muted mt-1">
+                  Screen-blocking intervention with slow-moving aurora gradient waves, 600×450px frosted glass card, 200px panicking Ribbit, glowing button, and +10 XP badge.
+                </p>
+              </div>
+
+              <div className="p-6 bg-black/90 rounded-2xl border border-theme-border/50 relative overflow-hidden flex items-center justify-center min-h-[500px]">
+                {/* Background aurora waves */}
+                <div
+                  className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(circle_at_20%_20%,rgba(76,175,80,0.35),transparent_40%),radial-gradient(circle_at_80%_80%,rgba(255,112,67,0.35),transparent_40%)] animate-aurora"
+                  style={{ backgroundSize: '200% 200%' }}
+                />
+
+                {/* Scaled preview card */}
+                <div className="w-[580px] max-w-full rounded-3xl bg-surface-dark/90 dark:bg-surface-dark/90 light:bg-white/95 backdrop-blur-2xl border-2 border-coral-alert p-6 flex flex-col items-center justify-between shadow-2xl relative overflow-hidden animate-pulse-coral z-10 select-none">
+                  <div className="text-center z-10 flex flex-col items-center gap-1">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-coral-alert/20 border border-coral-alert/40 text-coral-alert text-xs font-display font-black tracking-widest uppercase">
+                      <AlertOctagon className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Level 5 · Screen-Lock Intervention</span>
+                    </div>
+                    <h1 className="font-display font-black text-xl tracking-tight text-white dark:text-white light:text-slate-900 mt-1">
+                      🚨 POSTURE CHECK! 🚨
+                    </h1>
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center my-3 z-10">
+                    <RibbitMascot state="concerned" size={150} showBreathing={true} />
+                    <p className="font-sans font-semibold text-sm text-white dark:text-white light:text-slate-800 text-center mt-2 max-w-md leading-snug px-3">
+                      WAKE UP! FULL STOP! Sit up straight, stretch your arms, and breathe! 🛑🐸
+                    </p>
+                  </div>
+
+                  <div className="w-full space-y-2.5 z-10">
+                    <button
+                      type="button"
+                      className="w-full py-3.5 px-6 rounded-2xl bg-frog-green text-white font-display font-black text-sm tracking-wide shadow-xl shadow-frog-green/45 flex items-center justify-center gap-2 cursor-pointer active:scale-97 transition-transform"
+                    >
+                      <Check className="w-5 h-5 stroke-[3]" />
+                      <span>✓ I'm sitting up! Let me get back to work!</span>
+                    </button>
+                    <div className="flex items-center justify-center gap-2 text-xs font-display font-bold text-golden-xp">
+                      <Sparkles className="w-3.5 h-3.5 text-golden-xp" />
+                      <span className="px-2 py-0.5 rounded-full bg-golden-xp/15 border border-golden-xp/30">
+                        +10 XP Check-in Reward
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
         )}

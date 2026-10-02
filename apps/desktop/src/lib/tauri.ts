@@ -467,6 +467,12 @@ export async function getNotificationHistory(limit = 50): Promise<NotificationRe
   return [...mockNotificationHistory].reverse().slice(0, limit);
 }
 
+const mockShownListeners = new Set<(notif: NotificationRecord) => void>();
+const mockAckListeners = new Set<(payload: NotificationAcknowledgedPayload) => void>();
+const mockSnoozedListeners = new Set<(payload: NotificationSnoozedPayload) => void>();
+const mockDismissedListeners = new Set<(payload: NotificationDismissedPayload) => void>();
+const mockExpiredListeners = new Set<(payload: NotificationExpiredPayload) => void>();
+
 /**
  * Send a level-specific test notification (1=Whisper, 2=Nudge, 3=Reminder)
  */
@@ -495,6 +501,13 @@ export async function testNotification(level: number): Promise<NotificationRecor
   if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
     new Notification(notif.title, { body: notif.body });
   }
+  mockShownListeners.forEach((cb) => {
+    try {
+      cb(notif);
+    } catch {
+      // Ignore listener dispatch errors
+    }
+  });
   return notif;
 }
 
@@ -520,10 +533,31 @@ export async function handleNotificationAction(
     if (item) {
       if (action === 'sitting_up' || action === 'acknowledge') {
         item.status = 'acknowledged';
+        mockAckListeners.forEach((cb) => {
+          try {
+            cb({ id: notificationId, xpEarned: 10 });
+          } catch {
+            // Ignore listener dispatch errors
+          }
+        });
       } else if (action === 'snooze') {
         item.status = 'snoozed';
+        mockSnoozedListeners.forEach((cb) => {
+          try {
+            cb({ id: notificationId, minutes: 5 });
+          } catch {
+            // Ignore listener dispatch errors
+          }
+        });
       } else if (action === 'dismiss') {
         item.status = 'dismissed';
+        mockDismissedListeners.forEach((cb) => {
+          try {
+            cb({ id: notificationId, reason: 'user_dismissed', level: item.level });
+          } catch {
+            // Ignore listener dispatch errors
+          }
+        });
       }
     }
   }
@@ -555,7 +589,10 @@ export async function subscribeToNotificationShown(
     });
     return unlisten;
   }
-  return () => {};
+  mockShownListeners.add(callback);
+  return () => {
+    mockShownListeners.delete(callback);
+  };
 }
 
 /**
@@ -570,7 +607,10 @@ export async function subscribeToNotificationAcknowledged(
     });
     return unlisten;
   }
-  return () => {};
+  mockAckListeners.add(callback);
+  return () => {
+    mockAckListeners.delete(callback);
+  };
 }
 
 /**
@@ -585,7 +625,10 @@ export async function subscribeToNotificationSnoozed(
     });
     return unlisten;
   }
-  return () => {};
+  mockSnoozedListeners.add(callback);
+  return () => {
+    mockSnoozedListeners.delete(callback);
+  };
 }
 
 /**
@@ -600,7 +643,10 @@ export async function subscribeToNotificationDismissed(
     });
     return unlisten;
   }
-  return () => {};
+  mockDismissedListeners.add(callback);
+  return () => {
+    mockDismissedListeners.delete(callback);
+  };
 }
 
 /**
@@ -615,7 +661,10 @@ export async function subscribeToNotificationExpired(
     });
     return unlisten;
   }
-  return () => {};
+  mockExpiredListeners.add(callback);
+  return () => {
+    mockExpiredListeners.delete(callback);
+  };
 }
 
 export interface PostureSettingsPayload {
@@ -1007,7 +1056,7 @@ export interface TodayStatsPayload {
   xpEarnedToday: number;
 }
 
-let mockUserProgress: UserProgressPayload = {
+const mockUserProgress: UserProgressPayload = {
   id: 1,
   totalXp: 1250,
   currentLevel: 6,
@@ -1019,7 +1068,7 @@ let mockUserProgress: UserProgressPayload = {
   updatedAt: new Date().toISOString(),
 };
 
-let mockTodayStats: TodayStatsPayload = {
+const mockTodayStats: TodayStatsPayload = {
   totalChecksToday: 8,
   acknowledgedToday: 7,
   acknowledgmentRate: 0.875,

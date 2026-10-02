@@ -15,6 +15,11 @@ import {
   LayoutDashboard,
   CheckCircle2,
 } from 'lucide-react';
+import {
+  WhisperNotification,
+  NudgeNotification,
+  ReminderNotification,
+} from '@/components/notifications';
 
 export default function App() {
   const { mode, setMode } = useThemeStore();
@@ -50,7 +55,14 @@ export default function App() {
     },
   });
 
-  const { isPermissionDenied, refreshPermission } = useNotifications({
+  const {
+    latestNotification,
+    acknowledge,
+    snooze,
+    dismiss,
+    isPermissionDenied,
+    refreshPermission,
+  } = useNotifications({
     onNotificationShown: (record) => {
       showFeedback(`Notification shown: ${record.title}`);
     },
@@ -225,7 +237,7 @@ export default function App() {
 
       {/* Floating Action/Event Feedback Toast */}
       {feedback && (
-        <div className="fixed bottom-6 right-6 z-50 animate-pop-in">
+        <div className="fixed bottom-6 right-6 z-40 animate-pop-in">
           <div
             className={`px-4 py-2.5 rounded-2xl shadow-xl backdrop-blur-md border text-xs font-medium flex items-center gap-2 ${
               feedback.isError
@@ -237,6 +249,42 @@ export default function App() {
             <span>{feedback.text}</span>
           </div>
         </div>
+      )}
+
+      {/* In-App Notification Host for Levels 1–3 */}
+      {latestNotification && latestNotification.status === 'shown' && (
+        <>
+          {latestNotification.level === 1 && (
+            <WhisperNotification
+              key={latestNotification.id}
+              message={latestNotification.body}
+              onAcknowledge={() => acknowledge(latestNotification.id)}
+              onDismiss={() => dismiss(latestNotification.id)}
+            />
+          )}
+
+          {latestNotification.level === 2 && (
+            <NudgeNotification
+              key={latestNotification.id}
+              title={latestNotification.title}
+              message={latestNotification.body}
+              onAcknowledge={() => acknowledge(latestNotification.id)}
+              onSnooze={() => snooze(5, latestNotification.id)}
+              onDismiss={() => dismiss(latestNotification.id)}
+            />
+          )}
+
+          {latestNotification.level === 3 && (
+            <ReminderNotification
+              key={latestNotification.id}
+              title={latestNotification.title}
+              message={latestNotification.body}
+              onAcknowledge={() => acknowledge(latestNotification.id)}
+              onSnooze={() => snooze(5, latestNotification.id)}
+              onDismiss={() => dismiss(latestNotification.id)}
+            />
+          )}
+        </>
       )}
     </main>
   );
