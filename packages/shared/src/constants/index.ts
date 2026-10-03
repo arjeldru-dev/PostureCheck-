@@ -10,11 +10,14 @@ import type {
  */
 export const XP_PER_ACKNOWLEDGE = 10;
 export const XP_DAILY_COMPLETION_BONUS = 50;
-export const XP_STREAK_BASE_MULTIPLIER = 5;
+export const XP_STREAK_BONUS_PER_DAY = 5;
+export const XP_STREAK_BASE_MULTIPLIER = 5; // Backward-compatibility alias
 export const XP_STREAK_BONUS_CAP = 100;
+export const XP_ACHIEVEMENT_MIN = 25;
+export const XP_ACHIEVEMENT_MAX = 100;
 
 /**
- * Level Progression Ladder
+ * Level Progression Ladder (25 Levels: Tadpole → Zen Master)
  */
 export const LEVEL_THRESHOLDS: readonly LevelProgression[] = [
   { level: 1, xpRequired: 0, title: 'Tadpole' },
@@ -22,9 +25,25 @@ export const LEVEL_THRESHOLDS: readonly LevelProgression[] = [
   { level: 3, xpRequired: 300, title: 'Hopper' },
   { level: 4, xpRequired: 600, title: 'Leaper' },
   { level: 5, xpRequired: 1000, title: 'Tree Frog' },
+  { level: 6, xpRequired: 1500, title: 'Spring Peeper' },
+  { level: 7, xpRequired: 2200, title: 'Chorus Frog' },
+  { level: 8, xpRequired: 3000, title: 'Red-Eyed' },
+  { level: 9, xpRequired: 4000, title: 'Glass Frog' },
   { level: 10, xpRequired: 5000, title: 'Poison Dart' },
+  { level: 11, xpRequired: 6200, title: 'Mantella' },
+  { level: 12, xpRequired: 7500, title: 'Tomato Frog' },
+  { level: 13, xpRequired: 9000, title: 'Pacman Frog' },
+  { level: 14, xpRequired: 10500, title: 'Goliath' },
   { level: 15, xpRequired: 12000, title: 'Bull Frog' },
+  { level: 16, xpRequired: 14000, title: 'Coqui' },
+  { level: 17, xpRequired: 16500, title: "Darwin's Frog" },
+  { level: 18, xpRequired: 19500, title: 'Golden Poison' },
+  { level: 19, xpRequired: 22500, title: 'Amazon Milk' },
   { level: 20, xpRequired: 25000, title: 'Frog Prince/Princess' },
+  { level: 21, xpRequired: 30000, title: 'Sage Toad' },
+  { level: 22, xpRequired: 35000, title: 'Mystic Frog' },
+  { level: 23, xpRequired: 40000, title: 'Elder Ribbit' },
+  { level: 24, xpRequired: 45000, title: 'Ascended Frog' },
   { level: 25, xpRequired: 50000, title: 'Zen Master' },
 ] as const;
 

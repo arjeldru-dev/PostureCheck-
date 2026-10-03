@@ -735,6 +735,18 @@ fn get_progress(db: State<'_, Database>) -> Result<UserProgress, String> {
     db.get_user_progress()
 }
 
+/// Command: Update user gamification progress in database and emit progress-updated
+#[tauri::command]
+fn update_progress(
+    progress: UserProgress,
+    app: tauri::AppHandle,
+    db: State<'_, Database>,
+) -> Result<UserProgress, String> {
+    let updated = db.update_user_progress(&progress)?;
+    let _ = app.emit("progress-updated", &updated);
+    Ok(updated)
+}
+
 /// Command: Get all achievements with unlock status
 #[tauri::command]
 fn get_achievements(db: State<'_, Database>) -> Result<Vec<AchievementItem>, String> {
@@ -979,6 +991,7 @@ pub fn run() {
             save_settings,
             get_posture_history,
             get_progress,
+            update_progress,
             get_achievements,
             get_today_stats,
             get_persisted_app_state,

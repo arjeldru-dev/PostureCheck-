@@ -5,6 +5,7 @@ import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
 import { useTrayState } from '@/hooks/useTrayState';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useGamificationStore } from '@/stores/gamificationStore';
 import { isTauriEnvironment } from '@/lib/tauri';
 import {
   Laptop,
@@ -76,6 +77,12 @@ export default function App() {
       showFeedback(`Notification dismissed`);
     },
   });
+
+  useEffect(() => {
+    useGamificationStore.getState().initialize().catch((err) => {
+      console.warn('Failed to initialize gamification store:', err);
+    });
+  }, []);
 
   useEffect(() => {
     if (trayError) {

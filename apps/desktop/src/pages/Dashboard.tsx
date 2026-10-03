@@ -9,10 +9,12 @@ import SpeechBubble from '@/components/ribbit/SpeechBubble';
 import ConfettiEffect from '@/components/ribbit/ConfettiEffect';
 import CountdownTimer from '@/components/dashboard/CountdownTimer';
 import QuickStats from '@/components/dashboard/QuickStats';
+import { LevelBadge, XpProgressBar } from '@/components/gamification';
 import { useRibbitState } from '@/hooks/useRibbitState';
 import { useTimer } from '@/hooks/useTimer';
 import { useTimerStore } from '@/stores/timerStore';
 import { useTrayState } from '@/hooks/useTrayState';
+import { useGamificationStore } from '@/stores/gamificationStore';
 import { getProgress, getTodayStats, type UserProgressPayload, type TodayStatsPayload } from '@/lib/tauri';
 import { playAcknowledgeSound, playCelebrationSound } from '@/lib/audio';
 import { defaultRotationEngine } from '@posture-check/shared';
@@ -77,12 +79,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
     xpEarnedToday: 70,
   });
 
+  const totalXp = useGamificationStore((s) => s.totalXp);
+  const currentLevel = useGamificationStore((s) => s.currentLevel);
+  const levelTitle = useGamificationStore((s) => s.levelTitle);
+  const currentStreak = useGamificationStore((s) => s.currentStreak);
+
   const [isAcknowledging, setIsAcknowledging] = useState(false);
 
   // Fetch updated stats from SQLite or mock
   const refreshStats = useCallback(async () => {
     try {
-      const [prog, stats] = await Promise.all([getProgress(), getTodayStats()]);
+      const [prog, stats] = await Promise.all([
+        getProgress(),
+        getTodayStats().catch(() => null),
+        useGamificationStore.getState().initialize().catch(() => null),
+      ]);
       if (prog) setProgress(prog);
       if (stats) setTodayStats(stats);
       return { prog, stats };
@@ -101,8 +112,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (isAcknowledging) return;
     setIsAcknowledging(true);
     try {
-      const prevLevel = progress.currentLevel;
-      const prevStreak = progress.currentStreak;
+      const prevLevel = currentLevel || progress.currentLevel;
+      const prevStreak = currentStreak || progress.currentStreak;
 
       const res = await acknowledge();
       const fresh = await refreshStats();
@@ -111,13 +122,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
       const hasLeveledUp = Boolean(newProg && newProg.currentLevel > prevLevel);
       const hitStreakMilestone = Boolean(
         newProg &&
-        newProg.currentStreak > prevStreak &&
-        ([3, 7, 14, 21, 30, 60, 90, 100, 365].includes(newProg.currentStreak) || newProg.currentStreak % 5 === 0)
+          newProg.currentStreak > prevStreak &&
+          ([3, 7, 14, 21, 30, 60, 90, 100, 365].includes(newProg.currentStreak) ||
+            newProg.currentStreak % 5 === 0)
       );
+
+      const xpEarned = res?.xpEarned || 10;
 
       if (hasLeveledUp && newProg) {
         playCelebrationSound();
-        triggerCelebrating(`🌟 LEVEL UP! You reached Level ${newProg.currentLevel}! Golden lily pad unlocked! 🏆🎉`);
+        triggerCelebrating(
+          `🌟 LEVEL UP! You reached Level ${newProg.currentLevel}! Golden lily pad unlocked! 🏆🎉`
+        );
         onShowFeedback?.(`🎉 Level Up! You reached Level ${newProg.currentLevel}!`);
       } else if (hitStreakMilestone && newProg) {
         playCelebrationSound();
@@ -127,8 +143,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       } else {
         playAcknowledgeSound();
         const ackMsg = defaultRotationEngine.getAcknowledgmentMessage();
-        triggerEncouraging(ackMsg);
-        onShowFeedback?.(`✓ Posture verified! +${res.xpEarned} XP earned 🎉`);
+        triggerEncouraging(`+${xpEarned} XP! 🐸 ${ackMsg}`);
+        onShowFeedback?.(`✓ Posture verified! +${xpEarned} XP earned 🎉`);
       }
     } catch (err) {
       console.error('Failed to acknowledge posture check:', err);
@@ -293,13 +309,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
       </div>
 
-      {/* Bottom Area: Quick Stats Row */}
+      {/* Bottom Area: Level Progress & Quick Stats */}
       <footer className="w-full flex flex-col items-center mt-6 pt-4 border-t border-theme-border/60">
+        {/* Level Progression & XP Bar */}
+        <div className="w-full max-w-lg mb-3 bg-theme-surface/70 border border-theme-border/80 rounded-2xl p-3 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <LevelBadge
+              level={currentLevel || progress.currentLevel}
+              title={levelTitle}
+              size="sm"
+            />
+            <span className="text-xs font-mono text-golden-xp font-semibold tabular-nums">
+              {`${(totalXp || progress.totalXp).toLocaleString()} XP`}
+            </span>
+          </div>
+          <XpProgressBar
+            totalXp={totalXp || progress.totalXp}
+            size="sm"
+          />
+        </div>
+
         <QuickStats
           todayChecks={todayStats.acknowledgedToday}
-          currentStreak={progress.currentStreak}
-          totalXp={progress.totalXp}
-          level={progress.currentLevel}
+          currentStreak={currentStreak || progress.currentStreak}
+          totalXp={totalXp || progress.totalXp}
+          level={currentLevel || progress.currentLevel}
         />
       </footer>
     </div>

@@ -268,7 +268,7 @@ impl PostureTimer {
 
         AcknowledgePayload {
             success: true,
-            xp_earned: 15, // Base 15 XP reward
+            xp_earned: 10, // Base 10 XP reward matching Phase 3 gamification spec
             acknowledged_at: now.to_rfc3339(),
             next_reminder_at: self.next_fire_at.map(|dt| dt.to_rfc3339()),
             current_escalation_level: self.current_escalation_level,

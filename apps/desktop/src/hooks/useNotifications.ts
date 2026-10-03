@@ -17,6 +17,8 @@ import {
   type NotificationExpiredPayload,
 } from '@/lib/tauri';
 
+import { useGamificationStore } from '@/stores/gamificationStore';
+
 export interface UseNotificationsOptions {
   onNotificationShown?: (record: NotificationRecord) => void;
   onNotificationAcknowledged?: (payload: NotificationAcknowledgedPayload) => void;
@@ -225,7 +227,23 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     }
   };
 
-  const acknowledge = (notificationId?: string) => executeAction('sitting_up', notificationId);
+  const acknowledge = async (notificationId?: string) => {
+    try {
+      const notifId = notificationId || latestNotification?.id;
+      const actionResult = await executeAction('sitting_up', notifId);
+      await useGamificationStore.getState().initialize().catch(() => null);
+      const state = useGamificationStore.getState();
+      return {
+        ...actionResult,
+        xpEarned: (actionResult as { xpEarned?: number })?.xpEarned ?? 10,
+        currentLevel: state.currentLevel,
+        levelTitle: state.levelTitle,
+      };
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+  };
   const snooze = (_minutes = 5, notificationId?: string) => executeAction('snooze', notificationId);
   const dismiss = (notificationId?: string) => executeAction('dismiss', notificationId);
 

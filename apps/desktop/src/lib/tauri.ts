@@ -238,7 +238,7 @@ export async function acknowledgeReminder(): Promise<AcknowledgePayload> {
 
   return {
     success: true,
-    xpEarned: 15,
+    xpEarned: 10,
     acknowledgedAt: now,
     nextReminderAt: next,
     currentEscalationLevel: 1,
@@ -1085,6 +1085,35 @@ export async function getProgress(): Promise<UserProgressPayload> {
     return await invoke<UserProgressPayload>('get_progress');
   }
   return { ...mockUserProgress };
+}
+
+/**
+ * Update user gamification progress in database
+ */
+export async function updateProgress(
+  progress: Partial<UserProgressPayload>
+): Promise<UserProgressPayload> {
+  if (isTauriEnvironment()) {
+    const current = await getProgress();
+    const merged = { ...current, ...progress, updatedAt: new Date().toISOString() };
+    return await invoke<UserProgressPayload>('update_progress', { progress: merged });
+  }
+  Object.assign(mockUserProgress, progress, { updatedAt: new Date().toISOString() });
+  return { ...mockUserProgress };
+}
+
+/**
+ * Subscribe to real-time progress updates from backend
+ */
+export async function subscribeToProgressUpdated(
+  cb: (payload: UserProgressPayload) => void
+): Promise<() => void> {
+  if (isTauriEnvironment()) {
+    return await listen<UserProgressPayload>('progress-updated', (event) => {
+      cb(event.payload);
+    });
+  }
+  return () => {};
 }
 
 /**

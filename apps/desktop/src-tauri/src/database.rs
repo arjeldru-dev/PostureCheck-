@@ -184,12 +184,24 @@ pub struct TodayStats {
 pub fn calculate_level_from_xp(total_xp: u32) -> u32 {
     let thresholds = [
         (25, 50_000),
+        (24, 45_000),
+        (23, 40_000),
+        (22, 35_000),
+        (21, 30_000),
         (20, 25_000),
+        (19, 22_500),
+        (18, 19_500),
+        (17, 16_500),
+        (16, 14_000),
         (15, 12_000),
+        (14, 10_500),
+        (13, 9_000),
+        (12, 7_500),
+        (11, 6_200),
         (10, 5_000),
-        (9, 3_700),
-        (8, 2_800),
-        (7, 2_100),
+        (9, 4_000),
+        (8, 3_000),
+        (7, 2_200),
         (6, 1_500),
         (5, 1_000),
         (4, 600),
@@ -1456,6 +1468,33 @@ mod tests {
         assert_eq!(progress.current_streak, 0);
         assert_eq!(progress.total_checks, 0);
         assert!(!progress.streak_freeze_available);
+    }
+
+    #[test]
+    fn test_user_progress_persistence_and_level_5_streak_freeze() {
+        let db = init_test_database();
+        let initial = db.get_user_progress().expect("initial progress");
+        assert_eq!(initial.total_xp, 0);
+
+        // Update progress to 1000 XP (Level 5: Tree Frog)
+        let updated = db
+            .update_user_progress(&UserProgress {
+                total_xp: 1000,
+                current_level: 5,
+                streak_freeze_available: true,
+                ..initial
+            })
+            .expect("update progress");
+
+        assert_eq!(updated.total_xp, 1000);
+        assert_eq!(updated.current_level, 5);
+        assert!(updated.streak_freeze_available);
+
+        // Verify persistence by querying again from SQLite
+        let queried = db.get_user_progress().expect("queried progress");
+        assert_eq!(queried.total_xp, 1000);
+        assert_eq!(queried.current_level, 5);
+        assert!(queried.streak_freeze_available);
     }
 
     #[test]

@@ -29,9 +29,9 @@ describe('timerStore', () => {
     useTimerStore.setState({ currentEscalationLevel: 3 });
     const res = await useTimerStore.getState().acknowledge();
     expect(res.success).toBe(true);
-    expect(res.xpEarned).toBe(15);
+    expect(res.xpEarned).toBe(10);
     expect(useTimerStore.getState().currentEscalationLevel).toBe(1);
-    expect(useTimerStore.getState().lastXpEarned).toBe(15);
+    expect(useTimerStore.getState().lastXpEarned).toBe(10);
   });
 
   it('ticks seconds correctly when running', () => {
