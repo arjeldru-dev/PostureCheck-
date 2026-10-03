@@ -1,15 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   CheckCircle2,
-  Clock,
   Coffee,
-  Flame,
-  Moon,
-  Pause,
-  Play,
-  Settings as SettingsIcon,
   Sparkles,
-  Volume2,
 } from 'lucide-react';
 import RibbitMascot from '@/components/ribbit/RibbitMascot';
 import SpeechBubble from '@/components/ribbit/SpeechBubble';
@@ -22,7 +15,7 @@ import { useTimerStore } from '@/stores/timerStore';
 import { useTrayState } from '@/hooks/useTrayState';
 import { getProgress, getTodayStats, type UserProgressPayload, type TodayStatsPayload } from '@/lib/tauri';
 import { playAcknowledgeSound, playCelebrationSound } from '@/lib/audio';
-import { RIBBIT_STATE_DESCRIPTIONS } from '@posture-check/shared';
+import { defaultRotationEngine } from '@posture-check/shared';
 
 export interface DashboardProps {
   onOpenSettings?: () => void;
@@ -31,8 +24,8 @@ export interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
-  onOpenSettings,
-  onOpenDesignSystem,
+  onOpenSettings: _onOpenSettings,
+  onOpenDesignSystem: _onOpenDesignSystem,
   onShowFeedback,
 }) => {
   // 1. Core Timer and Tray Hooks
@@ -49,13 +42,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const activeReminder = timer.activeReminder ?? useTimerStore.getState().activeReminder;
 
   const {
-    status: trayStatus,
     isDnd,
     isActive,
     togglePause,
-    setDnd,
-    cancelDnd,
-    syncWithBackend: syncTray,
   } = useTrayState();
 
   // 2. Ribbit Mascot State Machine
@@ -123,7 +112,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       const hitStreakMilestone = Boolean(
         newProg &&
         newProg.currentStreak > prevStreak &&
-        [3, 5, 7, 10, 14, 21, 30].includes(newProg.currentStreak)
+        ([3, 7, 14, 21, 30, 60, 90, 100, 365].includes(newProg.currentStreak) || newProg.currentStreak % 5 === 0)
       );
 
       if (hasLeveledUp && newProg) {
@@ -132,11 +121,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
         onShowFeedback?.(`🎉 Level Up! You reached Level ${newProg.currentLevel}!`);
       } else if (hitStreakMilestone && newProg) {
         playCelebrationSound();
-        triggerCelebrating(`🔥 ${newProg.currentStreak}-Day Streak Milestone! Ribbit is ecstatic! 🎉`);
+        const streakMsg = defaultRotationEngine.getStreakMessage(newProg.currentStreak);
+        triggerCelebrating(streakMsg);
         onShowFeedback?.(`🔥 Milestone: ${newProg.currentStreak} day streak reached!`);
       } else {
         playAcknowledgeSound();
-        triggerEncouraging(`Awesome posture! +${res.xpEarned} XP! ✨`);
+        const ackMsg = defaultRotationEngine.getAcknowledgmentMessage();
+        triggerEncouraging(ackMsg);
         onShowFeedback?.(`✓ Posture verified! +${res.xpEarned} XP earned 🎉`);
       }
     } catch (err) {

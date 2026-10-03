@@ -1,5 +1,15 @@
 import type { IntensityLevel, MascotMessage, MascotState, MascotTone } from '../types/index';
 
+// Re-export message catalog, acknowledgment, golden frog, and rotation engine modules
+export * from './catalog';
+export * from './acknowledgments';
+export * from './golden-frog';
+export * from './rotation';
+
+/**
+ * Legacy RIBBIT_MESSAGES catalog maintained for backwards compatibility
+ * across existing mascot components and tests.
+ */
 export const RIBBIT_MESSAGES: readonly MascotMessage[] = [
   // --- Level 1: Whisper (Subtle, gentle, quiet) ---
   {

@@ -680,6 +680,7 @@ export interface PostureSettingsPayload {
   dndEnabled: boolean;
   isActiveProfile: boolean;
   level5OptIn?: boolean;
+  mascotTone?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -697,6 +698,7 @@ export interface SaveSettingsPayload {
   dndEnabled?: boolean;
   isActiveProfile?: boolean;
   level5OptIn?: boolean;
+  mascotTone?: string;
 }
 
 /**
@@ -1094,3 +1096,67 @@ export async function getTodayStats(): Promise<TodayStatsPayload> {
   }
   return { ...mockTodayStats };
 }
+
+/**
+ * Configure mascot tone in backend rotation engine
+ */
+export async function setMascotToneBackend(tone: string): Promise<void> {
+  if (isTauriEnvironment()) {
+    try {
+      await invoke('set_mascot_tone', { tone });
+    } catch (err) {
+      console.warn('Failed to sync mascot tone to backend:', err);
+    }
+  }
+}
+
+/**
+ * Retrieve next mascot message from backend rotation engine
+ */
+export async function getNextMascotMessageBackend(
+  level?: number,
+  tone?: string,
+  streakDays?: number
+): Promise<string> {
+  if (isTauriEnvironment()) {
+    try {
+      return await invoke<string>('get_next_mascot_message', {
+        level,
+        tone,
+        streakDays,
+      });
+    } catch {
+      // Fall through to fallback
+    }
+  }
+  return 'Ribbit says: Time to sit up tall! 🐸';
+}
+
+/**
+ * Retrieve positive acknowledgment message from backend rotation engine
+ */
+export async function getMascotAcknowledgmentMessageBackend(): Promise<string> {
+  if (isTauriEnvironment()) {
+    try {
+      return await invoke<string>('get_mascot_acknowledgment_message');
+    } catch {
+      // Fall through
+    }
+  }
+  return 'Great job! Your back thanks you! 🐸';
+}
+
+/**
+ * Retrieve streak celebration message from backend rotation engine
+ */
+export async function getMascotStreakMessageBackend(streakDays: number): Promise<string> {
+  if (isTauriEnvironment()) {
+    try {
+      return await invoke<string>('get_mascot_streak_message', { streakDays });
+    } catch {
+      // Fall through
+    }
+  }
+  return `🔥 ${streakDays}-day streak! Keep that posture flame burning! Ribbit! 🐸`;
+}
+

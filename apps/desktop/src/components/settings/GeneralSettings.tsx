@@ -13,8 +13,9 @@ import {
   AlertTriangle,
   Loader2,
   ExternalLink,
+  MessageSquare,
 } from 'lucide-react';
-import type { ThemeMode, MascotTone } from '@posture-check/shared';
+import { type ThemeMode, type MascotTone, MESSAGE_CATALOG } from '@posture-check/shared';
 
 function GithubIcon({ className = 'w-4 h-4' }: { className?: string }) {
   return (
@@ -223,6 +224,33 @@ export default function GeneralSettings() {
             );
           })}
         </div>
+
+        {/* 3 Sample Messages Preview */}
+        {(() => {
+          const tone = mascotTone || 'encouraging';
+          const samples = MESSAGE_CATALOG[2][tone]?.slice(0, 3) || [];
+          return (
+            <div className="p-4 rounded-xl bg-(--color-theme-card) border border-(--color-theme-border) space-y-2.5">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-(--color-frog-green)" />
+                <span className="text-xs font-semibold text-(--color-theme-text)">
+                  Sample Messages ({tone.charAt(0).toUpperCase() + tone.slice(1)} Tone):
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                {samples.map((s, i) => (
+                  <div
+                    key={`${s}-${i}`}
+                    className="p-3 rounded-lg bg-(--color-theme-surface) border border-(--color-theme-border) text-xs flex items-start gap-2 text-(--color-theme-text)"
+                  >
+                    <span className="text-sm shrink-0">🐸</span>
+                    <p className="italic text-(--color-theme-text) leading-relaxed">"{s}"</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Data Management Section */}

@@ -21,6 +21,7 @@ pub struct PostureSettings {
     pub created_at: String,
     pub updated_at: String,
     pub level5_opt_in: bool,
+    pub mascot_tone: String,
 }
 
 impl Default for PostureSettings {
@@ -40,6 +41,7 @@ impl Default for PostureSettings {
             created_at: Utc::now().to_rfc3339(),
             updated_at: Utc::now().to_rfc3339(),
             level5_opt_in: false,
+            mascot_tone: "encouraging".to_string(),
         }
     }
 }
@@ -70,6 +72,8 @@ pub struct SaveSettingsInput {
     pub is_active_profile: Option<bool>,
     #[serde(alias = "level5_opt_in")]
     pub level5_opt_in: Option<bool>,
+    #[serde(alias = "mascot_tone")]
+    pub mascot_tone: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -221,7 +225,7 @@ impl Database {
                 "SELECT id, profile_name, interval_minutes, intensity_level,
                         active_hours_start, active_hours_end, active_days,
                         routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                        created_at, updated_at, level5_opt_in
+                        created_at, updated_at, level5_opt_in, mascot_tone
                  FROM posture_settings
                  WHERE is_active_profile = 1
                  ORDER BY created_at ASC
@@ -246,6 +250,7 @@ impl Database {
                     created_at: row.get(11)?,
                     updated_at: row.get(12)?,
                     level5_opt_in: row.get::<_, Option<i64>>(13).unwrap_or(Some(0)).unwrap_or(0) != 0,
+                    mascot_tone: row.get::<_, Option<String>>(14).unwrap_or(None).unwrap_or_else(|| "encouraging".to_string()),
                 })
             })
             .optional()
@@ -267,7 +272,7 @@ impl Database {
                         "SELECT id, profile_name, interval_minutes, intensity_level,
                                 active_hours_start, active_hours_end, active_days,
                                 routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                                created_at, updated_at, level5_opt_in
+                                created_at, updated_at, level5_opt_in, mascot_tone
                          FROM posture_settings
                          WHERE id = ?1",
                     )
@@ -290,6 +295,7 @@ impl Database {
                             created_at: row.get(11)?,
                             updated_at: row.get(12)?,
                             level5_opt_in: row.get::<_, Option<i64>>(13).unwrap_or(Some(0)).unwrap_or(0) != 0,
+                            mascot_tone: row.get::<_, Option<String>>(14).unwrap_or(None).unwrap_or_else(|| "encouraging".to_string()),
                         })
                     })
                     .optional()
@@ -301,7 +307,7 @@ impl Database {
                         "SELECT id, profile_name, interval_minutes, intensity_level,
                                 active_hours_start, active_hours_end, active_days,
                                 routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                                created_at, updated_at, level5_opt_in
+                                created_at, updated_at, level5_opt_in, mascot_tone
                          FROM posture_settings
                          WHERE is_active_profile = 1
                          ORDER BY created_at ASC
@@ -326,6 +332,7 @@ impl Database {
                             created_at: row.get(11)?,
                             updated_at: row.get(12)?,
                             level5_opt_in: row.get::<_, Option<i64>>(13).unwrap_or(Some(0)).unwrap_or(0) != 0,
+                            mascot_tone: row.get::<_, Option<String>>(14).unwrap_or(None).unwrap_or_else(|| "encouraging".to_string()),
                         })
                     })
                     .optional()
@@ -364,6 +371,9 @@ impl Database {
         if let Some(opt_in) = input.level5_opt_in {
             current.level5_opt_in = opt_in;
         }
+        if let Some(tone) = input.mascot_tone {
+            current.mascot_tone = tone;
+        }
         current.updated_at = now_utc;
 
         tx.execute(
@@ -371,8 +381,8 @@ impl Database {
                 id, profile_name, interval_minutes, intensity_level,
                 active_hours_start, active_hours_end, active_days,
                 routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                created_at, updated_at, level5_opt_in
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+                created_at, updated_at, level5_opt_in, mascot_tone
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
             ON CONFLICT(id) DO UPDATE SET
                 profile_name = excluded.profile_name,
                 interval_minutes = excluded.interval_minutes,
@@ -385,7 +395,8 @@ impl Database {
                 dnd_enabled = excluded.dnd_enabled,
                 is_active_profile = excluded.is_active_profile,
                 updated_at = excluded.updated_at,
-                level5_opt_in = excluded.level5_opt_in;",
+                level5_opt_in = excluded.level5_opt_in,
+                mascot_tone = excluded.mascot_tone;",
             params![
                 current.id,
                 current.profile_name,
@@ -401,6 +412,7 @@ impl Database {
                 current.created_at,
                 current.updated_at,
                 if current.level5_opt_in { 1 } else { 0 },
+                current.mascot_tone,
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -915,7 +927,7 @@ impl Database {
                 "SELECT id, profile_name, interval_minutes, intensity_level,
                         active_hours_start, active_hours_end, active_days,
                         routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                        created_at, updated_at, level5_opt_in
+                        created_at, updated_at, level5_opt_in, mascot_tone
                  FROM posture_settings
                  ORDER BY created_at ASC",
             )
@@ -938,6 +950,7 @@ impl Database {
                     created_at: row.get(11)?,
                     updated_at: row.get(12)?,
                     level5_opt_in: row.get::<_, Option<i64>>(13).unwrap_or(Some(0)).unwrap_or(0) != 0,
+                    mascot_tone: row.get::<_, Option<String>>(14).unwrap_or(None).unwrap_or_else(|| "encouraging".to_string()),
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -974,7 +987,7 @@ impl Database {
                 "SELECT id, profile_name, interval_minutes, intensity_level,
                         active_hours_start, active_hours_end, active_days,
                         routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                        created_at, updated_at, level5_opt_in
+                        created_at, updated_at, level5_opt_in, mascot_tone
                  FROM posture_settings
                  WHERE id = ?1",
             )
@@ -997,6 +1010,7 @@ impl Database {
                     created_at: row.get(11)?,
                     updated_at: row.get(12)?,
                     level5_opt_in: row.get::<_, Option<i64>>(13).unwrap_or(Some(0)).unwrap_or(0) != 0,
+                    mascot_tone: row.get::<_, Option<String>>(14).unwrap_or(None).unwrap_or_else(|| "encouraging".to_string()),
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -1021,6 +1035,7 @@ impl Database {
         let dnd_enabled = input.dnd_enabled.unwrap_or(false);
         let make_active = input.is_active_profile.unwrap_or(false);
         let level5_opt_in = input.level5_opt_in.unwrap_or(false);
+        let mascot_tone = input.mascot_tone.unwrap_or_else(|| "encouraging".to_string());
 
         let mut conn = self.conn.lock().map_err(|e| e.to_string())?;
         let tx = conn.transaction().map_err(|e| e.to_string())?;
@@ -1045,6 +1060,7 @@ impl Database {
             created_at: now_utc.clone(),
             updated_at: now_utc.clone(),
             level5_opt_in,
+            mascot_tone,
         };
 
         tx.execute(
@@ -1052,8 +1068,8 @@ impl Database {
                 id, profile_name, interval_minutes, intensity_level,
                 active_hours_start, active_hours_end, active_days,
                 routing_mode, auto_escalation, dnd_enabled, is_active_profile,
-                created_at, updated_at, level5_opt_in
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                created_at, updated_at, level5_opt_in, mascot_tone
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
             params![
                 profile.id,
                 profile.profile_name,
@@ -1069,6 +1085,7 @@ impl Database {
                 profile.created_at,
                 profile.updated_at,
                 if profile.level5_opt_in { 1 } else { 0 },
+                profile.mascot_tone,
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -1237,6 +1254,18 @@ pub fn apply_migrations(conn: &Connection) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     }
 
+    // 006_add_mascot_tone
+    if !applied_versions.contains(&6) {
+        let sql_006 = include_str!("../migrations/006_add_mascot_tone.sql");
+        conn.execute_batch(sql_006)
+            .map_err(|e| format!("Migration 006_add_mascot_tone failed: {}", e))?;
+        conn.execute(
+            "INSERT INTO _migrations (version, description) VALUES (6, 'add_mascot_tone')",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
     Ok(())
 }
 
@@ -1300,6 +1329,25 @@ mod tests {
         assert!(!settings.dnd_enabled);
         assert!(settings.is_active_profile);
         assert!(!settings.level5_opt_in);
+        assert_eq!(settings.mascot_tone, "encouraging");
+    }
+
+    #[test]
+    fn test_mascot_tone_persistence() {
+        let db = init_test_database();
+        let initial = db.get_settings().expect("get initial settings");
+        assert_eq!(initial.mascot_tone, "encouraging");
+
+        let updated = db
+            .save_settings(SaveSettingsInput {
+                mascot_tone: Some("sassy".to_string()),
+                ..Default::default()
+            })
+            .expect("save tone");
+        assert_eq!(updated.mascot_tone, "sassy");
+
+        let fetched = db.get_settings().expect("fetch saved tone");
+        assert_eq!(fetched.mascot_tone, "sassy");
     }
 
     #[test]

@@ -20,6 +20,7 @@ import {
   cancelDnd as tauriCancelDnd,
   testNotification as tauriTestNotification,
   subscribeToTrayState,
+  setMascotToneBackend,
   type PostureSettingsPayload,
   type SaveSettingsPayload,
 } from '@/lib/tauri';
@@ -37,6 +38,7 @@ export interface QuickProfile {
   autoEscalation: boolean;
   dndEnabled: boolean;
   level5OptIn: boolean;
+  mascotTone?: MascotTone;
   isActiveProfile: boolean;
 }
 
@@ -118,6 +120,10 @@ function formatDaysString(days: number[]): string {
 }
 
 function mapPayloadToProfile(payload: PostureSettingsPayload): QuickProfile {
+  let tone: MascotTone = 'encouraging';
+  if (payload.mascotTone === 'encouraging' || payload.mascotTone === 'sassy' || payload.mascotTone === 'minimal') {
+    tone = payload.mascotTone;
+  }
   return {
     id: payload.id,
     profileName: payload.profileName || 'Default',
@@ -130,6 +136,7 @@ function mapPayloadToProfile(payload: PostureSettingsPayload): QuickProfile {
     autoEscalation: !!payload.autoEscalation,
     dndEnabled: !!payload.dndEnabled,
     level5OptIn: !!payload.level5OptIn,
+    mascotTone: tone,
     isActiveProfile: !!payload.isActiveProfile,
   };
 }
@@ -216,6 +223,8 @@ export const useSettingsStore = create<SettingsStoreState>((set) => ({
       });
 
       // Subscribe to real-time tray state changes to keep DND in lockstep
+      setMascotToneBackend(storedTone);
+
       subscribeToTrayState((trayState) => {
         set({ dndEnabled: trayState.isDnd });
       });
@@ -350,6 +359,10 @@ export const useSettingsStore = create<SettingsStoreState>((set) => ({
     if (typeof window !== 'undefined') {
       localStorage.setItem('posturecheck_mascot_tone', tone);
     }
+    setMascotToneBackend(tone);
+    tauriSaveSettings({ mascotTone: tone }).catch((err) => {
+      console.warn('Failed to persist mascot tone to database:', err);
+    });
   },
 
   setNotificationSound: (sound: NotificationSound) => {
@@ -388,8 +401,13 @@ export const useSettingsStore = create<SettingsStoreState>((set) => ({
       set({
         ...activeProfile,
         profiles: mappedProfiles,
+        mascotTone: activeProfile.mascotTone || 'encouraging',
         loading: false,
       });
+
+      if (typeof window !== 'undefined' && activeProfile.mascotTone) {
+        localStorage.setItem('posturecheck_mascot_tone', activeProfile.mascotTone);
+      }
     } catch (err) {
       set({
         loading: false,

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { RibbitState } from '@posture-check/shared';
 import type { ReminderEventPayload } from '@/lib/tauri';
-import { getRandomRibbitMessage } from '@posture-check/shared';
+import { getRandomRibbitMessage, defaultRotationEngine } from '@posture-check/shared';
 import { useTimerStore } from '@/stores/timerStore';
 import { useAppStore } from '@/stores/appStore';
 
@@ -120,7 +120,7 @@ export function useRibbitState(options: UseRibbitStateOptions = {}): UseRibbitSt
       clearTransient();
       setIsDismissed(false);
       setTransientState('encouraging');
-      const msg = customMsg || getRandomRibbitMessage({ state: 'encouraging' }).text;
+      const msg = customMsg || defaultRotationEngine.getAcknowledgmentMessage();
       setTransientMessage(msg);
 
       transientTimerRef.current = setTimeout(() => {

@@ -11,8 +11,16 @@ import {
   AlertTriangle,
   X,
   ShieldCheck,
+  Smile,
+  MessageSquare,
+  RefreshCw,
 } from 'lucide-react';
-import { INTENSITY_CONFIGS, type IntensityLevel } from '@posture-check/shared';
+import {
+  INTENSITY_CONFIGS,
+  type IntensityLevel,
+  type MascotTone,
+  MESSAGE_CATALOG,
+} from '@posture-check/shared';
 
 const INTENSITY_ITEMS: Array<{
   level: IntensityLevel;
@@ -52,16 +60,44 @@ const INTENSITY_ITEMS: Array<{
   },
 ];
 
+const TONE_OPTIONS: Array<{
+  id: MascotTone;
+  label: string;
+  emoji: string;
+  desc: string;
+}> = [
+  {
+    id: 'encouraging',
+    label: 'Encouraging',
+    emoji: '💖',
+    desc: 'Warm, supportive, motivating reminders to keep your spirits high.',
+  },
+  {
+    id: 'sassy',
+    label: 'Sassy',
+    emoji: '😏',
+    desc: 'Playful, witty, slightly cheeky ribbits when you catch yourself slouching.',
+  },
+  {
+    id: 'minimal',
+    label: 'Minimal',
+    emoji: '🧘',
+    desc: 'Short, to-the-point, no fluff cues for distraction-free focus.',
+  },
+];
+
 export default function NotificationSettings() {
   const {
     intensityLevel,
     autoEscalation,
     notificationSound,
     level5OptIn,
+    mascotTone,
     setIntensityLevel,
     setAutoEscalation,
     optInLevel5,
     setNotificationSound,
+    setMascotTone,
     testNotification,
   } = useSettingsStore();
 
@@ -69,6 +105,11 @@ export default function NotificationSettings() {
   const [testSuccess, setTestSuccess] = useState<string | null>(null);
   const [showOptInModal, setShowOptInModal] = useState<boolean>(false);
   const [isConfirmingOptIn, setIsConfirmingOptIn] = useState<boolean>(false);
+  const [sampleOffset, setSampleOffset] = useState<number>(0);
+
+  useEffect(() => {
+    setSampleOffset(0);
+  }, [intensityLevel]);
 
   useEffect(() => {
     if (!showOptInModal) return;
@@ -127,6 +168,20 @@ export default function NotificationSettings() {
     } finally {
       setTestingLevel(null);
     }
+  };
+
+  // Active tone and sample messages
+  const activeTone: MascotTone = mascotTone || 'encouraging';
+  const poolForTone =
+    MESSAGE_CATALOG[intensityLevel as IntensityLevel]?.[activeTone] ||
+    MESSAGE_CATALOG[2][activeTone];
+  const sampleMessages =
+    poolForTone.slice(sampleOffset, sampleOffset + 3).length === 3
+      ? poolForTone.slice(sampleOffset, sampleOffset + 3)
+      : poolForTone.slice(0, 3);
+
+  const handleShuffleSamples = () => {
+    setSampleOffset((prev) => (prev + 3 >= poolForTone.length ? 0 : prev + 3));
   };
 
   return (
@@ -332,6 +387,100 @@ export default function NotificationSettings() {
               </button>
             );
           })}
+        </div>
+      </div>
+
+      {/* Mascot Personality & Tone Selector with 3-message Preview */}
+      <div className="p-6 rounded-2xl bg-(--color-theme-surface) border border-(--color-theme-border) shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-base font-semibold flex items-center gap-2">
+              <Smile className="w-5 h-5 text-(--color-frog-green)" />
+              Mascot Personality & Tone
+            </h3>
+            <p className="text-xs text-(--color-theme-muted) mt-0.5">
+              Customize Ribbit's personality style and sample how reminder messages will sound during posture checks.
+            </p>
+          </div>
+          <span className="text-[11px] font-semibold bg-(--color-frog-green)/10 text-(--color-frog-green) px-2.5 py-1 rounded-full border border-(--color-frog-green)/20 self-start sm:self-auto">
+            Selected: {activeTone.charAt(0).toUpperCase() + activeTone.slice(1)}
+          </span>
+        </div>
+
+        {/* Tone Selector Cards */}
+        <div
+          role="radiogroup"
+          aria-label="Ribbit Mascot Personality Tone"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+        >
+          {TONE_OPTIONS.map((item) => {
+            const isSelected = activeTone === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                onClick={() => {
+                  setMascotTone(item.id);
+                  setSampleOffset(0);
+                }}
+                className={`p-4 rounded-xl border text-left transition-all ${
+                  isSelected
+                    ? 'border-(--color-frog-green) bg-(--color-frog-green)/10 shadow-sm ring-1 ring-(--color-frog-green)/40'
+                    : 'border-(--color-theme-border) bg-(--color-theme-card) hover:border-(--color-frog-green)/40'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{item.emoji}</span>
+                    <span className="text-xs font-bold">{item.label}</span>
+                  </div>
+                  {isSelected && <Check className="w-4 h-4 text-(--color-frog-green)" />}
+                </div>
+                <p className="text-[11px] text-(--color-theme-muted) mt-1.5 leading-relaxed">
+                  {item.desc}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 3 Sample Messages Preview Panel */}
+        <div className="p-4 rounded-xl bg-(--color-theme-card) border border-(--color-theme-border) space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-(--color-frog-green)" />
+              <span className="text-xs font-semibold text-(--color-theme-text)">
+                Sample Messages ({activeTone.charAt(0).toUpperCase() + activeTone.slice(1)} Tone)
+              </span>
+              <span className="text-[10px] text-(--color-theme-muted)">
+                (Level {intensityLevel} pool)
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleShuffleSamples}
+              className="inline-flex items-center gap-1.5 text-xs text-(--color-frog-green) hover:underline font-medium"
+            >
+              <RefreshCw className="w-3 h-3" />
+              <span>Shuffle Samples</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+            {sampleMessages.map((sample, idx) => (
+              <div
+                key={`${sample}-${idx}`}
+                className="p-3 rounded-lg bg-(--color-theme-surface) border border-(--color-theme-border) text-xs flex items-start gap-2 text-(--color-theme-text) shadow-2xs"
+              >
+                <span className="text-sm shrink-0">🐸</span>
+                <p className="italic text-(--color-theme-text) leading-relaxed">
+                  "{sample}"
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

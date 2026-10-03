@@ -502,7 +502,12 @@ pub fn start_timer_engine(app: AppHandle, notify: Arc<Notify>) {
                 let picked_msg = {
                     if let Some(mgr) = app.try_state::<std::sync::Mutex<crate::notifications::NotificationManager>>() {
                         if let Ok(mut lock) = mgr.lock() {
-                            lock.pick_message(reminder.level)
+                            let streak = if let Some(db) = app.try_state::<crate::database::Database>() {
+                                db.get_user_progress().ok().map(|p| p.current_streak as u32)
+                            } else {
+                                None
+                            };
+                            lock.pick_message_with_context(reminder.level, streak)
                         } else {
                             reminder.message.clone()
                         }

@@ -143,12 +143,14 @@ pub struct NotificationRecord {
     pub actions: Vec<NotificationAction>,
 }
 
-/// In-memory notification manager state
+/// In-memory notification manager state with message rotation engine
 pub struct NotificationManager {
     pub default_intensity_level: u8,
     pub history: Vec<NotificationRecord>,
-    pub last_message_index: Option<usize>,
     pub active_notification_id: Option<String>,
+    pub current_tone: String,
+    pub recent_messages: Vec<String>,
+    pub last_acknowledgment: Option<String>,
 }
 
 impl Default for NotificationManager {
@@ -156,100 +158,445 @@ impl Default for NotificationManager {
         Self {
             default_intensity_level: 2, // Default: Level 2 (Nudge)
             history: Vec::new(),
-            last_message_index: None,
             active_notification_id: None,
+            current_tone: "encouraging".to_string(),
+            recent_messages: Vec::new(),
+            last_acknowledgment: None,
         }
     }
 }
 
-// Curated pool of Ribbit messages by intensity level (from @posture-check/shared)
-pub const LEVEL_1_MESSAGES: &[&str] = &[
-    "Psst! How's your back feeling? 🐸",
-    "Gentle check-in from your friendly frog.",
-    "Soft reminder: relax your shoulders. ✨",
-    "Just a tiny whisper: align your spine! 🌿",
-    "Unclench your jaw, soften your neck.",
+// ============================================================================
+// Level 1: Whisper Pools
+// ============================================================================
+pub const LEVEL_1_ENCOURAGING: &[&str] = &[
+    "Psst! Quick posture check 🐸",
+    "How's your back doing right now? ✨",
+    "Gentle reminder: sit tall and breathe.",
+    "Tiny frog tap: relax your shoulders. 🌿",
+    "Just a soft whisper to align your spine.",
+    "Unclench your jaw, soften your neck. 💚",
     "A little frog wink for your posture 😉",
+    "Psst! Lift your chin slightly and smile.",
+    "Friendly nudge: let your back feel supported.",
+    "Take a slow breath and gently reset. 🌸",
+    "Micro-stretch time: roll your wrists and neck.",
+    "Your spine loves a quick check-in! 🐸",
 ];
 
-pub const LEVEL_2_MESSAGES: &[&str] = &[
-    "Ribbit! Time to sit up straight! 🐸",
-    "Quick posture check! You got this 💪",
-    "Hey friend, your spine says thank you! 💚",
-    "Stretch break? Even frogs need to hop around! 🐸",
-    "Roll those shoulders back. Ah, much better!",
-    "Are you turning into a shrimp? Sit tall! 🦐",
-    "Take a deep breath and reset your back.",
+pub const LEVEL_1_SASSY: &[&str] = &[
+    "Psst... I see you creeping toward the screen 👀",
+    "Are you melting into your chair again? 🐸",
+    "Just checking if your spine still has a pulse.",
+    "Tiny reminder: you're human, not an overcooked noodle 🍜",
+    "Shrimp mode detected at whisper volume 🦐",
+    "Psst! Gravity isn't your excuse today.",
+    "Did your head just sink two inches? Lift it! 👀",
+    "Quiet whisper: don't make me ribbit louder.",
+    "Your neck is doing too much heavy lifting right now.",
+    "Tiny check: are you sitting or disintegrating?",
+    "A little side-eye from your frog companion 😏",
+    "Un-slouch real quick, nobody saw... except me 🐸",
+];
+
+pub const LEVEL_1_MINIMAL: &[&str] = &[
+    "Posture check.",
+    "Sit tall.",
+    "Align spine.",
+    "Roll shoulders back.",
+    "Relax neck and jaw.",
+    "Check posture.",
+    "Crown high, feet flat.",
+    "Micro-reset.",
+    "Shoulders down.",
+    "Reset alignment.",
+    "Breathe and lengthen.",
+    "Sit upright.",
+];
+
+// ============================================================================
+// Level 2: Nudge Pools
+// ============================================================================
+pub const LEVEL_2_ENCOURAGING: &[&str] = &[
+    "Hey friend! Time for a posture check 🐸",
+    "Your spine says thank you when you sit up!",
+    "Quick stretch? Even frogs need to hop around! 🌿",
+    "Ribbit! Let's sit tall and conquer the day! 💪",
+    "Roll those shoulders back. Ah, feels much better!",
     "Your future self will thank you for sitting straight now.",
-    "Shoulders back, crown high!",
-    "Check in: are you slouching right now?",
-    "A gentle nudge to reset your spinal alignment.",
-    "Breathe deep, sit tall, feel the frog energy!",
+    "Take a deep breath, reset your back, and keep shining! ✨",
+    "A friendly hop to remind you: you're doing great! 🐸",
+    "Chest open, shoulders relaxed. You've got this!",
+    "Spinal check-in! Treat your back with kindness.",
+    "Let's add a quick point to your posture streak! 🌟",
+    "Sit tall like a proud frog on a giant lily pad 🪷",
+    "Breathe in deep, lengthen your back, exhale the slouch.",
+    "Posture break! A small reset makes a big difference.",
 ];
 
-pub const LEVEL_3_MESSAGES: &[&str] = &[
-    "Posture alert! Roll those shoulders back right now. 🐸",
-    "Straighten up! Your future back will thank Ribbit.",
-    "Time for a 10-second stretch break!",
-    "Attention: Slouching detected! Align your posture now.",
-    "Ribbit reminder: Sit tall like a majestic frog on a lily pad!",
+pub const LEVEL_2_SASSY: &[&str] = &[
+    "Ribbit! Are you slouching again? 👀",
+    "I see that slouch... don't make me ribbit louder!",
+    "Plot twist: your chair isn't a bed 🐸",
+    "Are you turning into a shrimp? Sit tall! 🦐",
+    "Your spine is shaped like a question mark right now. Answer it! ❓",
+    "Ribbit! Stop auditioning for the Hunchback of Notre Dame!",
+    "Chair posture check: upright citizen or melted puddle? 😏",
+    "I'm watching your posture from the lily pad. Straighten up!",
+    "Gravity is winning. Fight back! 🐸⚡",
+    "Did the keyboard magnetize your forehead? Back up!",
+    "Ribbit! Slouching burns zero calories. Sit straight!",
+    "Nice hunch! Is that the new ergonomic trend? Didn't think so.",
+    "Ribbit says: uncurl the spine before you evolve backwards.",
+    "Hey! You promised yourself good posture today!",
+];
+
+pub const LEVEL_2_MINIMAL: &[&str] = &[
+    "Time to reset posture.",
+    "Sit up straight.",
+    "Spine check: ears over shoulders.",
+    "Feet flat, back straight.",
+    "Roll shoulders, lift chest.",
+    "Quick posture correction.",
+    "Adjust your seated posture.",
+    "Straighten your spine.",
+    "Reset back alignment.",
+    "Check your head position.",
+    "Un-hunch and breathe.",
+    "Posture interval: sit tall.",
+    "Level 2 check: reset now.",
+    "Back straight, eyes level.",
+];
+
+// ============================================================================
+// Level 3: Reminder Pools
+// ============================================================================
+pub const LEVEL_3_ENCOURAGING: &[&str] = &[
+    "Time to sit up straight! You got this 💪🐸",
+    "Your future self thanks you for good posture!",
+    "Ribbit! Posture check time — let's go! 🌿",
+    "Hey! Ribbit is tapping on your glass: Posture check! 🪟🐸",
+    "Time to level up your posture! Sit tall and tap acknowledge.",
+    "Spinal health is wealth! Take 5 seconds to adjust. ✨",
     "Your spine is carrying your dreams today. Give it some love! 🌟",
-    "Up, up, up! Straighten that spine before the lily pad sinks! 🪷",
-    "Don't make Ribbit give you the disappointed stare... Sit tall!",
+    "Ribbit reminder: Sit tall like a majestic frog on a lily pad!",
+    "Stretch your torso, roll back those shoulder blades, and smile!",
+    "Posture logged is habit built! Claim your XP right now! 🏆",
+    "Take pride in that posture! Sit tall and strong! 🐸💚",
+    "Keep your energy high by giving your lungs full room to expand!",
+    "Spine aligned, mind focused! Let's keep the streak alive! 🔥",
+    "Ribbit believes in your upright posture journey!",
 ];
 
-pub const LEVEL_4_MESSAGES: &[&str] = &[
-    "ATTENTION: Serious slouch alert! Straighten your spine now! 🚨",
-    "Ribbit is jumping with urgency! Back off the desk! 🐸⚡",
+pub const LEVEL_3_SASSY: &[&str] = &[
+    "Don't ignore me! Your spine needs a quick adjustment 👀",
+    "I see that monitor hunch. Don't make me hop over there! 🐸",
+    "Slouching detected! Straighten up before I ribbit in all caps!",
+    "Did your spine file a formal complaint? Because I'm hearing one.",
+    "Posture check! You're slouching so hard you're about to slip off the chair!",
+    "Ribbit! That's not good posture, that's modern caveman posture 🦴",
+    "Your monitor is too far down or your back is giving up. Fix it!",
+    "I'm not leaving this corner of your screen until you sit up straight! 🐸",
+    "Plot twist: slouching won't make the code compile faster.",
+    "Ribbit warns: permanent hunchback in 3... 2... 1... Straighten up!",
+    "Don't make Ribbit give you the disappointed frog stare... 😐🐸",
+    "You're paying for an ergonomic chair, why are you sitting like a pretzel?",
+    "Ribbit demands spine justice right now!",
+    "Hey! Yes, you! Shoulders back, chin in, sit upright!",
+];
+
+pub const LEVEL_3_MINIMAL: &[&str] = &[
+    "Posture reminder: ears over shoulders, eyes level.",
+    "Feet flat on the floor, back supported. Reset now.",
+    "Persistent reminder: align spine and acknowledge.",
+    "Straighten your back. Pull shoulder blades together.",
+    "Time to sit straight and clear this banner.",
+    "Adjust seated position: lift ribcage, drop shoulders.",
+    "Spine correction required: sit upright.",
+    "Check monitor distance and straighten back.",
+    "Acknowledge posture reset to continue.",
+    "Align lumbar curve and sit back in chair.",
+    "Posture break: straighten up now.",
+    "Spinal reset reminder: acknowledge when upright.",
+    "Level 3 reminder: sit upright, shoulders back.",
+    "Posture alert: reset alignment immediately.",
+];
+
+// ============================================================================
+// Level 4: Alert Pools
+// ============================================================================
+pub const LEVEL_4_ENCOURAGING: &[&str] = &[
+    "⏰ Hey! This is your posture reminder! Sit up NOW! 🐸⚡",
+    "Your back is literally begging you right now! Let's fix it!",
+    "Ribbit is jumping with urgency! Back off the desk! 🐸💪",
     "You've been hunched too long! Sit up straight and claim your XP!",
-    "Posture emergency! Un-hunch immediately for your own good!",
-    "Priority check: Lift your chest, pull back your chin.",
-    "Your spine called—it wants its natural curve back right now!",
+    "Break the slump cycle right now! Deep breath, sit tall!",
+    "Spine intervention! Stand or sit tall — you can do this!",
+    "Urgent posture check: protect your spine before stiffness sets in!",
+    "Ribbit alert: Stand up or sit upright! Treat your body with respect!",
+    "Take 10 seconds for your health right now. Straighten your posture!",
+    "Time to reset with intensity! Push your shoulders back and rise!",
 ];
 
-pub const LEVEL_5_MESSAGES: &[&str] = &[
-    "WAKE UP! FULL STOP! Sit up straight, stretch your arms, and breathe! 🛑🐸",
-    "EMERGENCY POSTURE INTERVENTION! Ribbit is panicking! Straighten up!",
-    "Screen blocked for your spinal safety! Roll your neck, align your back.",
-    "No more excuses! Sit up like royalty before you continue.",
-    "CRITICAL RESET: Stand or sit upright. Ribbit demands spine justice!",
+pub const LEVEL_4_SASSY: &[&str] = &[
+    "RIBBIT! I'm not going away until you fix that posture! 🐸🚨",
+    "ATTENTION: Serious slouch alert! Straighten your spine now!",
+    "Posture emergency! Un-hunch immediately for your own good!",
+    "Your spine called—it wants its natural curve back right now!",
+    "Are you trying to fold yourself in half? SIT UP!",
+    "Ribbit is this close to hopping onto your keyboard! Straighten up! 🐸",
+    "Stop ignoring your spine! You look like a cashew nut right now!",
+    "Red alert! Drop the slouch, pull back the shoulders, or else!",
+    "Level 4 alert: your posture is an OSHA hazard right now!",
+    "RIBBIT! Even a tadpole sits straighter than that!",
 ];
+
+pub const LEVEL_4_MINIMAL: &[&str] = &[
+    "ALERT: Straighten posture immediately.",
+    "Priority check: Lift chest, pull back chin.",
+    "Severe slouch detected. Sit upright now.",
+    "Posture intervention: correct spine alignment.",
+    "Urgent posture reset required.",
+    "Level 4 Alert: align spine and acknowledge.",
+    "Attention: un-hunch back and neck now.",
+    "Immediate action required: sit tall.",
+    "Spine check: disengage slouch immediately.",
+    "Posture Alert: reset body positioning now.",
+];
+
+// ============================================================================
+// Level 5: Wake Up! Pools
+// ============================================================================
+pub const LEVEL_5_ENCOURAGING: &[&str] = &[
+    "🚨 POSTURE EMERGENCY! Sit up RIGHT NOW! 🚨",
+    "THIS IS NOT A DRILL! Your spine needs you! 🐸❤️",
+    "WAKE UP! FULL STOP! Sit up straight, stretch your arms, and breathe! 🛑🐸",
+    "CRITICAL RESET: Stand or sit upright. Ribbit demands spine justice!",
+    "Spine protection mode active! Stretch tall, inhale deep, reset now!",
+    "Pause everything! Take 15 seconds to honor your body and sit upright!",
+    "Emergency posture pause! You deserve a pain-free back, let's reset!",
+    "Ribbit intervention: You're too important to ruin your back. Sit tall!",
+];
+
+pub const LEVEL_5_SASSY: &[&str] = &[
+    "I will NOT stop until you sit up straight! 🐸🚨",
+    "EMERGENCY POSTURE INTERVENTION! Ribbit is panicking! Straighten up!",
+    "No more excuses! Sit up like royalty before you continue! 👑",
+    "Full screen takeover! Your slouch has violated the laws of physics!",
+    "Ribbit has officially locked down your screen. Un-slouch to survive! 🐸💥",
+    "You chose Level 5, now face the consequences: SIT UP STRAIGHT!",
+    "I am the blocker of screens and the guardian of spines! RISE UP!",
+    "Slouch level critical! Ribbit has seized the means of production! 🐸🛑",
+];
+
+pub const LEVEL_5_MINIMAL: &[&str] = &[
+    "EMERGENCY: Sit upright to unlock screen.",
+    "Screen blocked for spinal safety. Align posture.",
+    "Full stop. Reset back, neck, and shoulders.",
+    "Critical posture lock: sit tall and acknowledge.",
+    "WAKE UP. Straighten spine immediately.",
+    "Halt. Restore proper ergonomic posture.",
+    "Mandatory posture correction in progress.",
+    "Action required: sit upright to proceed.",
+];
+
+// ============================================================================
+// Golden Frog & Acknowledgment Pools
+// ============================================================================
+pub const GOLDEN_FROG_MESSAGES: &[&str] = &[
+    "✨ The Golden Frog speaks: your posture is magnificent! 👑🐸",
+    "✨ 30+ days! I've evolved into my golden form for you!",
+    "✨ Golden aura activated! You have achieved true postural enlightenment!",
+    "✨ Behold the Golden Ribbit: over a month of unyielding backbone excellence!",
+    "✨ A radiant posture fit for the Golden Lily Pad! Keep shining!",
+    "✨ The golden glow of spinal mastery illuminates your desk! 🌟",
+    "✨ 30+ days unbroken! The mythical Golden Frog bows in deep respect.",
+    "✨ You are among the elite few who hear the Golden Ribbit! Sit proud! 🏆",
+    "✨ Pure gold! Your spine is stronger and straighter than ever before! 🌿✨",
+    "✨ Legendary form unlocked: Your dedication shines across the entire pond! 👑",
+    "✨ Golden Ribbit blessing: Keep sitting tall, true posture champion!",
+    "✨ The sacred golden lily pad belongs to you! Incredible 30+ day streak! 🪷",
+];
+
+pub const ACKNOWLEDGMENT_MESSAGES: &[&str] = &[
+    "Great job! Your back thanks you! 🐸",
+    "That's what I'm talking about! 💪",
+    "Ribbit! You're a posture champion!",
+    "Posture logged! Spine aligned and shining! ✨",
+    "Look at that royal posture! Long live your spine! 👑",
+    "Smooth adjustment! Ribbit nods in deep approval.",
+    "+10 XP secured! Feeling tall and proud. 🌟",
+    "Spine aligned, mind focused! Back to crushing it! 🚀",
+    "Awesome job! Sitting tall looks great on you! 👍🐸",
+    "Habit point claimed! Every little check counts!",
+    "A majestic reset! The lily pad salutes you 🪷",
+    "Ribbit is doing a happy hop! Fantastic posture! 🐸🎉",
+    "Your back is rejoicing right now! Keep it up!",
+    "Posture master in the making! Streak safe and sound!",
+    "Spinal harmony restored. Carry on, legend! 🌿",
+];
+
+// Legacy aliases for backwards compatibility
+pub const LEVEL_1_MESSAGES: &[&str] = LEVEL_1_ENCOURAGING;
+pub const LEVEL_2_MESSAGES: &[&str] = LEVEL_2_ENCOURAGING;
+pub const LEVEL_3_MESSAGES: &[&str] = LEVEL_3_ENCOURAGING;
+pub const LEVEL_4_MESSAGES: &[&str] = LEVEL_4_ENCOURAGING;
+pub const LEVEL_5_MESSAGES: &[&str] = LEVEL_5_ENCOURAGING;
 
 impl NotificationManager {
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Selects a randomized message for the level without repeating the last index back-to-back
-    pub fn pick_message(&mut self, level: u8) -> String {
-        use rand::Rng;
-
-        let pool = match level {
-            1 => LEVEL_1_MESSAGES,
-            3 => LEVEL_3_MESSAGES,
-            4 => LEVEL_4_MESSAGES,
-            5 => LEVEL_5_MESSAGES,
-            _ => LEVEL_2_MESSAGES,
+    /// Sets the active mascot personality tone
+    pub fn set_tone(&mut self, tone: &str) {
+        self.current_tone = match tone {
+            "sassy" => "sassy".to_string(),
+            "minimal" => "minimal".to_string(),
+            _ => "encouraging".to_string(),
         };
+    }
+
+    /// Retrieves the current mascot personality tone
+    pub fn get_tone(&self) -> &str {
+        &self.current_tone
+    }
+
+    /// Selects a randomized message for the level using current tone, guaranteeing no repeats in last 5 messages
+    pub fn pick_message(&mut self, level: u8) -> String {
+        let tone = self.current_tone.clone();
+        self.pick_message_with_tone(level, &tone, None)
+    }
+
+    /// Selects message with optional streak context to unlock Golden Frog messages (>30 days)
+    pub fn pick_message_with_context(&mut self, level: u8, streak_days: Option<u32>) -> String {
+        let tone = self.current_tone.clone();
+        self.pick_message_with_tone(level, &tone, streak_days)
+    }
+
+    /// Selects a randomized message for specific level, tone, and streak count
+    pub fn pick_message_with_tone(&mut self, level: u8, tone: &str, streak_days: Option<u32>) -> String {
+        // 1. Golden frog unlock check (>30 days streak)
+        if let Some(streak) = streak_days {
+            if streak > 30 {
+                return self.select_from_pool(GOLDEN_FROG_MESSAGES);
+            }
+        }
+
+        // 2. Select from level + tone pool
+        let pool = match (level, tone) {
+            (1, "sassy") => LEVEL_1_SASSY,
+            (1, "minimal") => LEVEL_1_MINIMAL,
+            (1, _) => LEVEL_1_ENCOURAGING,
+
+            (2, "sassy") => LEVEL_2_SASSY,
+            (2, "minimal") => LEVEL_2_MINIMAL,
+            (2, _) => LEVEL_2_ENCOURAGING,
+
+            (3, "sassy") => LEVEL_3_SASSY,
+            (3, "minimal") => LEVEL_3_MINIMAL,
+            (3, _) => LEVEL_3_ENCOURAGING,
+
+            (4, "sassy") => LEVEL_4_SASSY,
+            (4, "minimal") => LEVEL_4_MINIMAL,
+            (4, _) => LEVEL_4_ENCOURAGING,
+
+            (5, "sassy") => LEVEL_5_SASSY,
+            (5, "minimal") => LEVEL_5_MINIMAL,
+            (5, _) => LEVEL_5_ENCOURAGING,
+
+            _ => LEVEL_2_ENCOURAGING,
+        };
+
+        self.select_from_pool(pool)
+    }
+
+    /// Selects a random message avoiding the last 5 messages in history
+    fn select_from_pool(&mut self, pool: &[&'static str]) -> String {
+        use rand::Rng;
 
         if pool.is_empty() {
             return "Time for a posture check! 🐸".to_string();
         }
 
-        let mut rng = rand::rng();
-        let mut idx = rng.random_range(0..pool.len());
+        // Exclude messages in recent_messages buffer
+        let candidates: Vec<&'static str> = pool
+            .iter()
+            .copied()
+            .filter(|msg| !self.recent_messages.iter().any(|r| r == *msg))
+            .collect();
 
-        // Ensure no back-to-back repeats if pool has > 1 item
-        if pool.len() > 1 {
-            if let Some(last) = self.last_message_index {
-                if idx == last {
-                    idx = (idx + 1) % pool.len();
-                }
+        let mut eligible = candidates;
+        if eligible.is_empty() {
+            // Buffer exhausted: reset but still exclude immediate last shown if possible
+            let last_shown = self.recent_messages.last().cloned();
+            self.recent_messages.clear();
+            if pool.len() > 1 && last_shown.is_some() {
+                let last_str = last_shown.unwrap();
+                eligible = pool.iter().copied().filter(|m| *m != last_str.as_str()).collect();
+            }
+            if eligible.is_empty() {
+                eligible = pool.to_vec();
             }
         }
 
-        self.last_message_index = Some(idx);
-        pool[idx].to_string()
+        let mut rng = rand::rng();
+        let idx = rng.random_range(0..eligible.len());
+        let selected = eligible[idx].to_string();
+
+        self.recent_messages.push(selected.clone());
+        if self.recent_messages.len() > 5 {
+            self.recent_messages.remove(0);
+        }
+
+        selected
+    }
+
+    /// Returns a positive acknowledgment message
+    pub fn get_acknowledgment_message(&mut self) -> String {
+        use rand::Rng;
+        let pool = ACKNOWLEDGMENT_MESSAGES;
+        let candidates: Vec<&'static str> = pool
+            .iter()
+            .copied()
+            .filter(|msg| {
+                if let Some(ref last) = self.last_acknowledgment {
+                    *msg != last.as_str()
+                } else {
+                    true
+                }
+            })
+            .collect();
+
+        let eligible = if candidates.is_empty() {
+            pool.to_vec()
+        } else {
+            candidates
+        };
+
+        let mut rng = rand::rng();
+        let idx = rng.random_range(0..eligible.len());
+        let selected = eligible[idx].to_string();
+        self.last_acknowledgment = Some(selected.clone());
+        selected
+    }
+
+    /// Returns a streak-specific celebration message
+    pub fn get_streak_message(&self, streak_days: u32) -> String {
+        match streak_days {
+            0 => "🌱 Day 1 starts today! Every great posture habit begins with a single hop! 🐸".to_string(),
+            1 => "🌱 Day 1 logged! The journey to healthy posture begins! 🐸".to_string(),
+            3 => "🔥 3-day streak! You're on fire!".to_string(),
+            7 => "🔥 7 days! Week warrior! Ribbit! 🐸".to_string(),
+            14 => "🔥 14 days! Two solid weeks of posture perfection! 🌟".to_string(),
+            21 => "🔥 21 days! Habit officially forged in stone! 💪".to_string(),
+            30 => "🔥 30 days! You're a posture legend! Golden Frog unlocked! 👑🐸".to_string(),
+            60 => "🔥 60 days! Unstoppable spinal discipline! Two full months! 🏆".to_string(),
+            90 => "🔥 90 days! A quarterly masterpiece of posture mastery! ✨".to_string(),
+            100 => "🔥 100 days! Triple-digit royalty! Century Club champion! 👑🎉".to_string(),
+            365 => "🔥 365 days! ONE FULL YEAR of elite posture! True legend status! 🪷👑".to_string(),
+            n => format!("🔥 {}-day streak! Keep that posture flame burning! Ribbit! 🐸", n),
+        }
     }
 
     /// Records a notification event in history (keeps last 100 entries)
@@ -382,7 +729,12 @@ pub fn show_posture_notification_with_id(
         None => {
             if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
                 if let Ok(mut lock) = mgr.lock() {
-                    lock.pick_message(effective_level)
+                    let streak = if let Some(db) = app.try_state::<crate::database::Database>() {
+                        db.get_user_progress().ok().map(|p| p.current_streak as u32)
+                    } else {
+                        None
+                    };
+                    lock.pick_message_with_context(effective_level, streak)
                 } else {
                     "Ribbit says: Time to sit up tall! 🐸".to_string()
                 }
@@ -932,6 +1284,30 @@ mod tests {
             assert_ne!(msg, prev);
             prev = msg;
         }
+    }
+
+    #[test]
+    fn test_pick_message_tone_and_streak() {
+        let mut mgr = NotificationManager::new();
+        mgr.set_tone("sassy");
+        let sassy_msg = mgr.pick_message(2);
+        assert!(LEVEL_2_SASSY.contains(&sassy_msg.as_str()));
+
+        mgr.set_tone("minimal");
+        let min_msg = mgr.pick_message(1);
+        assert!(LEVEL_1_MINIMAL.contains(&min_msg.as_str()));
+
+        // Golden frog when streak > 30
+        let golden_msg = mgr.pick_message_with_context(3, Some(35));
+        assert!(GOLDEN_FROG_MESSAGES.contains(&golden_msg.as_str()));
+
+        // Acknowledgment message
+        let ack = mgr.get_acknowledgment_message();
+        assert!(ACKNOWLEDGMENT_MESSAGES.contains(&ack.as_str()));
+
+        // Streak milestone
+        let streak_msg = mgr.get_streak_message(7);
+        assert_eq!(streak_msg, "🔥 7 days! Week warrior! Ribbit! 🐸");
     }
 
     #[test]

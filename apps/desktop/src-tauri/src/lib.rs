@@ -463,6 +463,70 @@ fn stop_alarm_sound(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Command: Configure the active mascot personality tone in the rotation engine
+#[tauri::command]
+fn set_mascot_tone(tone: String, app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
+        if let Ok(mut lock) = mgr.lock() {
+            lock.set_tone(&tone);
+        }
+    }
+    if let Some(db) = app.try_state::<Database>() {
+        let _ = db.save_settings(SaveSettingsInput {
+            mascot_tone: Some(tone),
+            ..Default::default()
+        });
+    }
+    Ok(())
+}
+
+/// Command: Get next mascot message from the rotation engine
+#[tauri::command]
+fn get_next_mascot_message(
+    level: Option<u8>,
+    tone: Option<String>,
+    streak_days: Option<u32>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
+        if let Ok(mut lock) = mgr.lock() {
+            let lvl = level.unwrap_or(2).clamp(1, 5);
+            let selected_tone = tone.unwrap_or_else(|| lock.get_tone().to_string());
+            let streak = streak_days.or_else(|| {
+                if let Some(db) = app.try_state::<crate::database::Database>() {
+                    db.get_user_progress().ok().map(|p| p.current_streak as u32)
+                } else {
+                    None
+                }
+            });
+            return Ok(lock.pick_message_with_tone(lvl, &selected_tone, streak));
+        }
+    }
+    Ok("Ribbit says: Time to sit up tall! 🐸".to_string())
+}
+
+/// Command: Get positive acknowledgment message from the rotation engine
+#[tauri::command]
+fn get_mascot_acknowledgment_message(app: tauri::AppHandle) -> Result<String, String> {
+    if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
+        if let Ok(mut lock) = mgr.lock() {
+            return Ok(lock.get_acknowledgment_message());
+        }
+    }
+    Ok("Great job! Your back thanks you! 🐸".to_string())
+}
+
+/// Command: Get streak milestone message from the rotation engine
+#[tauri::command]
+fn get_mascot_streak_message(streak_days: u32, app: tauri::AppHandle) -> Result<String, String> {
+    if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
+        if let Ok(lock) = mgr.lock() {
+            return Ok(lock.get_streak_message(streak_days));
+        }
+    }
+    Ok(format!("🔥 {}-day streak! Keep that posture flame burning! Ribbit! 🐸", streak_days))
+}
+
 /// Command: Send a native test notification to verify OS capabilities
 #[tauri::command]
 fn send_test_notification(app: tauri::AppHandle) -> Result<(), String> {
@@ -643,6 +707,7 @@ fn save_settings(
     if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
         if let Ok(mut lock) = mgr.lock() {
             lock.default_intensity_level = saved.intensity_level;
+            lock.set_tone(&saved.mascot_tone);
         }
     }
 
@@ -750,6 +815,7 @@ fn switch_profile(
     if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
         if let Ok(mut lock) = mgr.lock() {
             lock.default_intensity_level = saved.intensity_level;
+            lock.set_tone(&saved.mascot_tone);
         }
     }
 
@@ -929,7 +995,11 @@ pub fn run() {
             close_overlay,
             refocus_fullscreen_overlay,
             play_alarm_sound,
-            stop_alarm_sound
+            stop_alarm_sound,
+            set_mascot_tone,
+            get_next_mascot_message,
+            get_mascot_acknowledgment_message,
+            get_mascot_streak_message
         ])
         .setup(move |app| {
             // 1. Initialize SQLite Database and run migrations
@@ -1012,6 +1082,7 @@ pub fn run() {
             if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
                 if let Ok(mut lock) = mgr.lock() {
                     lock.default_intensity_level = settings.intensity_level;
+                    lock.set_tone(&settings.mascot_tone);
                 }
             }
 
