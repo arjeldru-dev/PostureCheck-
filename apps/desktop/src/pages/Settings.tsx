@@ -47,7 +47,7 @@ export default function Settings({ onBackToDashboard, initialTab = 'timing' }: S
   }, [hasLoaded, loadSettings]);
 
   return (
-    <div className="h-screen max-h-screen bg-(--color-theme-bg) text-(--color-theme-text) font-sans antialiased selection:bg-(--color-frog-green)/20 flex flex-col overflow-y-auto">
+    <div className="min-h-full w-full bg-(--color-theme-bg) text-(--color-theme-text) font-sans antialiased selection:bg-(--color-frog-green)/20 flex flex-col">
       {/* Top Header Bar */}
       <header className="sticky top-0 z-40 bg-(--color-theme-bg)/90 backdrop-blur-md border-b border-(--color-theme-border) px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">

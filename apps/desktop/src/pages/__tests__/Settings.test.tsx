@@ -4,13 +4,13 @@ import { renderToString } from 'react-dom/server';
 import Settings from '../Settings';
 
 describe('Settings Page Layout & Scrollability Regression Tests', () => {
-  it('renders root container with overflow-y-auto and bounded height for scrolling', () => {
+  it('renders root container with flexible layout for desktop window scrolling', () => {
     const html = renderToString(<Settings />);
 
-    // Verify root container has scroll classes to prevent clipping inside Tauri 600px window
-    expect(html).toContain('overflow-y-auto');
-    expect(html).toContain('h-screen');
-    expect(html).toContain('max-h-screen');
+    // Verify root container has flexible classes to prevent clipping inside desktop window
+    expect(html).toContain('min-h-full');
+    expect(html).toContain('w-full');
+    expect(html).toContain('flex-col');
   });
 
   it('renders fixed/sticky header with shrink-0', () => {

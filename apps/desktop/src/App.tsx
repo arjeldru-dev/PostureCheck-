@@ -91,9 +91,9 @@ export default function App() {
   }, [trayError]);
 
   return (
-    <main className="min-h-screen bg-theme-bg text-theme-text flex flex-col justify-between select-none transition-colors duration-200">
+    <main className="h-full w-full bg-theme-bg text-theme-text flex flex-col select-none transition-colors duration-200 overflow-hidden">
       {/* Top Application Bar */}
-      <header className="sticky top-0 z-30 bg-theme-bg/90 backdrop-blur-md border-b border-theme-border px-6 py-3.5">
+      <header className="shrink-0 z-30 bg-theme-bg/90 backdrop-blur-md border-b border-theme-border px-6 py-3.5">
         <div className="max-w-4xl w-full mx-auto flex items-center justify-between">
           {/* Logo & Version */}
           <div
@@ -224,13 +224,15 @@ export default function App() {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 py-4 flex flex-col overflow-y-auto">
+      <div className="flex-1 min-h-0 w-full overflow-y-auto">
         {currentView === 'dashboard' && (
-          <Dashboard
-            onOpenSettings={() => setCurrentView('settings')}
-            onOpenDesignSystem={() => setCurrentView('design-system')}
-            onShowFeedback={showFeedback}
-          />
+          <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-4 min-h-full flex flex-col">
+            <Dashboard
+              onOpenSettings={() => setCurrentView('settings')}
+              onOpenDesignSystem={() => setCurrentView('design-system')}
+              onShowFeedback={showFeedback}
+            />
+          </div>
         )}
 
         {currentView === 'settings' && (

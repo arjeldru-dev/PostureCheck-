@@ -9,7 +9,12 @@ import SpeechBubble from '@/components/ribbit/SpeechBubble';
 import ConfettiEffect from '@/components/ribbit/ConfettiEffect';
 import CountdownTimer from '@/components/dashboard/CountdownTimer';
 import QuickStats from '@/components/dashboard/QuickStats';
-import { LevelBadge, XpProgressBar } from '@/components/gamification';
+import {
+  LevelBadge,
+  XpProgressBar,
+  StreakCounter,
+  DailySummary,
+} from '@/components/gamification';
 import { useRibbitState } from '@/hooks/useRibbitState';
 import { useTimer } from '@/hooks/useTimer';
 import { useTimerStore } from '@/stores/timerStore';
@@ -56,6 +61,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     isCelebrating,
     triggerEncouraging,
     triggerCelebrating,
+    triggerDisappointed,
     dismissMessage,
     setMessage,
   } = useRibbitState({ activeReminder });
@@ -83,6 +89,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const currentLevel = useGamificationStore((s) => s.currentLevel);
   const levelTitle = useGamificationStore((s) => s.levelTitle);
   const currentStreak = useGamificationStore((s) => s.currentStreak);
+  const streakFreezeAvailable = useGamificationStore((s) => s.streakFreezeAvailable);
+  const freezeUsedThisWeek = useGamificationStore((s) => s.freezeUsedThisWeek);
 
   const [isAcknowledging, setIsAcknowledging] = useState(false);
 
@@ -92,7 +100,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       const [prog, stats] = await Promise.all([
         getProgress(),
         getTodayStats().catch(() => null),
-        useGamificationStore.getState().initialize().catch(() => null),
       ]);
       if (prog) setProgress(prog);
       if (stats) setTodayStats(stats);
@@ -106,6 +113,46 @@ export const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     refreshStats();
   }, [refreshStats]);
+
+  // Listen for streak events (milestone, broken, freeze used)
+  useEffect(() => {
+    const handleMilestone = (e: Event) => {
+      const detail = (e as CustomEvent<{ streak: number }>).detail;
+      const streak = detail?.streak ?? 7;
+      playCelebrationSound();
+      const streakMsg =
+        streak >= 30
+          ? defaultRotationEngine.getGoldenFrogMessage()
+          : defaultRotationEngine.getStreakMessage(streak);
+      triggerCelebrating(streakMsg);
+      onShowFeedback?.(`🔥 Milestone: ${streak}-day streak reached!`);
+    };
+
+    const handleBroken = () => {
+      triggerDisappointed('Aww, streak broken... 🥺');
+      setTimeout(() => {
+        triggerEncouraging("Don't worry! Let's start a new streak today! 🐸");
+      }, 2500);
+      onShowFeedback?.('Streak reset. Ready for a fresh start! 🌱');
+    };
+
+    const handleFreezeUsed = (e: Event) => {
+      const detail = (e as CustomEvent<{ streak: number }>).detail;
+      onShowFeedback?.(
+        `🛡️ Streak Freeze protected your ${detail?.streak ?? ''} day streak!`
+      );
+    };
+
+    window.addEventListener('streak-milestone', handleMilestone);
+    window.addEventListener('streak-broken', handleBroken);
+    window.addEventListener('streak-freeze-used', handleFreezeUsed);
+
+    return () => {
+      window.removeEventListener('streak-milestone', handleMilestone);
+      window.removeEventListener('streak-broken', handleBroken);
+      window.removeEventListener('streak-freeze-used', handleFreezeUsed);
+    };
+  }, [triggerCelebrating, triggerDisappointed, triggerEncouraging, onShowFeedback]);
 
   // Handle reminder acknowledgment
   const handleAcknowledge = async () => {
@@ -123,8 +170,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       const hitStreakMilestone = Boolean(
         newProg &&
           newProg.currentStreak > prevStreak &&
-          ([3, 7, 14, 21, 30, 60, 90, 100, 365].includes(newProg.currentStreak) ||
-            newProg.currentStreak % 5 === 0)
+          [7, 14, 30, 60, 100].includes(newProg.currentStreak)
       );
 
       const xpEarned = res?.xpEarned || 10;
@@ -135,12 +181,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           `🌟 LEVEL UP! You reached Level ${newProg.currentLevel}! Golden lily pad unlocked! 🏆🎉`
         );
         onShowFeedback?.(`🎉 Level Up! You reached Level ${newProg.currentLevel}!`);
-      } else if (hitStreakMilestone && newProg) {
-        playCelebrationSound();
-        const streakMsg = defaultRotationEngine.getStreakMessage(newProg.currentStreak);
-        triggerCelebrating(streakMsg);
-        onShowFeedback?.(`🔥 Milestone: ${newProg.currentStreak} day streak reached!`);
-      } else {
+      } else if (!hitStreakMilestone) {
+        // Milestone celebration is handled by the 'streak-milestone' event listener
         playAcknowledgeSound();
         const ackMsg = defaultRotationEngine.getAcknowledgmentMessage();
         triggerEncouraging(`+${xpEarned} XP! 🐸 ${ackMsg}`);
@@ -219,7 +261,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const effectiveStatus = isDnd ? 'dnd' : !isActive ? 'paused' : timerStatus;
 
   return (
-    <div className="relative flex flex-col items-center justify-between min-h-[calc(100vh-5rem)] w-full max-w-4xl mx-auto px-4 py-2 select-none overflow-y-auto">
+    <div className="relative flex flex-col items-center justify-between min-h-full w-full mx-auto px-4 py-2 select-none">
       {/* Confetti Particle Layer during Celebration */}
       <ConfettiEffect active={isCelebrating} />
 
@@ -309,10 +351,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
       </div>
 
-      {/* Bottom Area: Level Progress & Quick Stats */}
-      <footer className="w-full flex flex-col items-center mt-6 pt-4 border-t border-theme-border/60">
+      {/* Bottom Area: Streak & Daily Summary, Level Progress & Quick Stats */}
+      <footer className="w-full flex flex-col items-center mt-6 pt-4 border-t border-theme-border/60 gap-3">
+        {/* Streak & Daily Summary Cards */}
+        <div className="w-full max-w-lg grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <StreakCounter
+            streak={currentStreak || progress.currentStreak}
+            longestStreak={progress.longestStreak}
+            freezeAvailable={streakFreezeAvailable}
+            freezeUsedThisWeek={freezeUsedThisWeek}
+            level={currentLevel || progress.currentLevel}
+            size="sm"
+          />
+          <DailySummary
+            totalChecksToday={todayStats.totalChecksToday}
+            acknowledgedToday={todayStats.acknowledgedToday}
+            size="sm"
+          />
+        </div>
+
         {/* Level Progression & XP Bar */}
-        <div className="w-full max-w-lg mb-3 bg-theme-surface/70 border border-theme-border/80 rounded-2xl p-3 shadow-xs">
+        <div className="w-full max-w-lg bg-theme-surface/70 border border-theme-border/80 rounded-2xl p-3 shadow-xs">
           <div className="flex items-center justify-between mb-2">
             <LevelBadge
               level={currentLevel || progress.currentLevel}

@@ -6,6 +6,12 @@ import {
   calculateXpForAcknowledge,
   getXpToNextLevel,
   isLevelUp,
+  shouldStreakBreak,
+  getStreakMilestone,
+  formatLocalDate,
+  getYesterdayLocalDate,
+  getIsoWeekKey,
+  calculatePostureScore,
 } from '@posture-check/shared';
 import {
   getProgress,
@@ -36,6 +42,14 @@ export interface XpGainedPayload {
   totalXp: number;
 }
 
+export interface StreakMilestonePayload {
+  streak: number;
+}
+
+export interface StreakBrokenPayload {
+  previousStreak: number;
+}
+
 export interface AcknowledgeResult {
   baseEarned: number;
   streakBonus: number;
@@ -45,6 +59,8 @@ export interface AcknowledgeResult {
   oldLevel: number;
   newLevel: number;
   newTitle: string;
+  streak: number;
+  streakMilestone: number | null;
 }
 
 export interface GamificationState {
@@ -57,8 +73,16 @@ export interface GamificationState {
   longestStreak: number;
   totalChecks: number;
   streakFreezeAvailable: boolean;
+  freezeUsedThisWeek: boolean;
+  lastFreezeWeek: string | null;
+  lastCheckDate: string | null;
+  lastEvaluatedDate: string;
   todayChecksCount: number;
   todayAcknowledgedCount: number;
+  // Aliases for convenience matching spec
+  todayChecks: number;
+  todayAcknowledged: number;
+
   isInitialized: boolean;
   isLoading: boolean;
   lastXpGain: XpGainInfo | null;
@@ -76,12 +100,24 @@ export interface GamificationState {
   }>;
   handleAcknowledge: () => Promise<AcknowledgeResult>;
   syncWithProgress: (progress: UserProgressPayload) => void;
+  checkStreakStatus: () => Promise<{
+    streak: number;
+    broken: boolean;
+    freezeUsed: boolean;
+  }>;
+  useStreakFreeze: () => Promise<boolean>;
+  resetWeeklyFreeze: () => Promise<void>;
+  scheduleMidnightCheck: () => void;
+  reconcileSleepWakeRollover: () => Promise<void>;
   reset: () => void;
 }
 
 const initialLevelInfo = calculateLevelFromXp(0);
 
 let unlistenProgressUpdated: (() => void) | null = null;
+let midnightTimerId: ReturnType<typeof setTimeout> | null = null;
+let heartbeatTimerId: ReturnType<typeof setInterval> | null = null;
+let isSleepWakeListenersAttached = false;
 
 export const useGamificationStore = create<GamificationState>((set, get) => ({
   totalXp: 0,
@@ -93,8 +129,14 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
   longestStreak: 0,
   totalChecks: 0,
   streakFreezeAvailable: false,
+  freezeUsedThisWeek: false,
+  lastFreezeWeek: null,
+  lastCheckDate: null,
+  lastEvaluatedDate: formatLocalDate(),
   todayChecksCount: 0,
   todayAcknowledgedCount: 0,
+  todayChecks: 0,
+  todayAcknowledged: 0,
   isInitialized: false,
   isLoading: false,
   lastXpGain: null,
@@ -109,6 +151,16 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
       ]);
 
       const levelInfo = calculateLevelFromXp(progress.totalXp);
+      const todayChecks = todayStats?.totalChecksToday ?? 0;
+      const todayAcknowledged = todayStats?.acknowledgedToday ?? 0;
+      const currentWeek = getIsoWeekKey();
+
+      // Check weekly freeze: resets in any new ISO week if user is Level 5+
+      const storedFreezeWeek = get().lastFreezeWeek;
+      const freezeUsedInCurrentWeek = storedFreezeWeek === currentWeek;
+      const streakFreezeAvailable =
+        progress.streakFreezeAvailable ||
+        (levelInfo.level >= 5 && !freezeUsedInCurrentWeek);
 
       set({
         totalXp: progress.totalXp,
@@ -119,9 +171,14 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
         currentStreak: progress.currentStreak,
         longestStreak: progress.longestStreak,
         totalChecks: progress.totalChecks,
-        streakFreezeAvailable: progress.streakFreezeAvailable,
-        todayChecksCount: todayStats?.totalChecksToday ?? 0,
-        todayAcknowledgedCount: todayStats?.acknowledgedToday ?? 0,
+        streakFreezeAvailable,
+        freezeUsedThisWeek: freezeUsedInCurrentWeek,
+        lastCheckDate: progress.lastCheckDate ?? null,
+        lastEvaluatedDate: formatLocalDate(),
+        todayChecksCount: todayChecks,
+        todayAcknowledgedCount: todayAcknowledged,
+        todayChecks,
+        todayAcknowledged,
         isInitialized: true,
         isLoading: false,
       });
@@ -134,12 +191,210 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
           unlistenProgressUpdated = cleanup;
         });
       }
+
+      // Check streak continuity on app startup
+      await get().checkStreakStatus();
+
+      // Schedule midnight check and sleep/wake recovery listeners
+      get().scheduleMidnightCheck();
+
+      // Setup window focus / visibility wake-up listener once
+      if (typeof window !== 'undefined' && !isSleepWakeListenersAttached) {
+        isSleepWakeListenersAttached = true;
+        const handleWake = () => {
+          get().reconcileSleepWakeRollover().catch(console.error);
+        };
+        window.addEventListener('focus', handleWake);
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            handleWake();
+          }
+        });
+
+        // 15-minute background heartbeat to recover gracefully from deep OS sleep
+        if (!heartbeatTimerId) {
+          heartbeatTimerId = setInterval(() => {
+            get().reconcileSleepWakeRollover().catch(console.error);
+          }, 15 * 60 * 1000);
+        }
+      }
     } catch (err) {
       set({
         isLoading: false,
         error: err instanceof Error ? err.message : String(err),
       });
     }
+  },
+
+  checkStreakStatus: async () => {
+    const {
+      currentStreak,
+      streakFreezeAvailable,
+      lastCheckDate,
+      currentLevel,
+      lastFreezeWeek,
+    } = get();
+
+    const todayStr = formatLocalDate();
+    const currentWeek = getIsoWeekKey();
+
+    // Check if a new calendar week arrived; reset freeze if Level 5+
+    if (currentLevel >= 5 && lastFreezeWeek && lastFreezeWeek !== currentWeek) {
+      await get().resetWeeklyFreeze();
+    }
+
+    if (currentStreak === 0) {
+      return { streak: 0, broken: false, freezeUsed: false };
+    }
+
+    const check = shouldStreakBreak(lastCheckDate, todayStr, streakFreezeAvailable);
+
+    if (check.broken) {
+      // Streak broken
+      const previousStreak = currentStreak;
+      set({ currentStreak: 0, lastEvaluatedDate: todayStr });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('streak-broken', { detail: { previousStreak } })
+        );
+      }
+      if (isTauriEnvironment()) {
+        emit('streak-broken', { previousStreak }).catch((e) => {
+          console.warn('Failed to emit streak-broken event:', e);
+        });
+      }
+
+      updateProgress({ currentStreak: 0 }).catch((err) => {
+        console.error('Failed to persist broken streak to SQLite:', err);
+      });
+
+      return { streak: 0, broken: true, freezeUsed: false };
+    }
+
+    if (check.freezeUsed) {
+      // Consumed weekly streak freeze to protect yesterday's missed day
+      // Advance lastCheckDate to yesterday to bridge the gap and prevent subsequent re-breaking today!
+      const yesterdayStr = getYesterdayLocalDate();
+
+      set({
+        streakFreezeAvailable: false,
+        freezeUsedThisWeek: true,
+        lastFreezeWeek: currentWeek,
+        lastCheckDate: yesterdayStr,
+        lastEvaluatedDate: todayStr,
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('streak-freeze-used', { detail: { streak: currentStreak } })
+        );
+      }
+      if (isTauriEnvironment()) {
+        emit('streak-freeze-used', { streak: currentStreak }).catch((e) => {
+          console.warn('Failed to emit streak-freeze-used event:', e);
+        });
+      }
+
+      updateProgress({
+        streakFreezeAvailable: false,
+        lastCheckDate: yesterdayStr,
+      }).catch((err) => {
+        console.error('Failed to persist used freeze to SQLite:', err);
+      });
+
+      return { streak: currentStreak, broken: false, freezeUsed: true };
+    }
+
+    set({ lastEvaluatedDate: todayStr });
+    return { streak: currentStreak, broken: false, freezeUsed: false };
+  },
+
+  useStreakFreeze: async () => {
+    const { streakFreezeAvailable } = get();
+    if (!streakFreezeAvailable) return false;
+
+    const currentWeek = getIsoWeekKey();
+    set({
+      streakFreezeAvailable: false,
+      freezeUsedThisWeek: true,
+      lastFreezeWeek: currentWeek,
+    });
+
+    await updateProgress({ streakFreezeAvailable: false }).catch((err) => {
+      console.error('Failed to persist used freeze:', err);
+    });
+
+    return true;
+  },
+
+  resetWeeklyFreeze: async () => {
+    const { currentLevel } = get();
+    if (currentLevel >= 5) {
+      set({
+        streakFreezeAvailable: true,
+        freezeUsedThisWeek: false,
+        lastFreezeWeek: null,
+      });
+
+      await updateProgress({ streakFreezeAvailable: true }).catch((err) => {
+        console.error('Failed to reset weekly freeze:', err);
+      });
+    }
+  },
+
+  reconcileSleepWakeRollover: async () => {
+    const todayStr = formatLocalDate();
+    if (get().lastEvaluatedDate !== todayStr) {
+      // Calendar date rolled over while machine was sleeping or suspended
+      await get().checkStreakStatus();
+      set({
+        lastEvaluatedDate: todayStr,
+        todayChecksCount: 0,
+        todayAcknowledgedCount: 0,
+        todayChecks: 0,
+        todayAcknowledged: 0,
+      });
+      get().scheduleMidnightCheck();
+    }
+  },
+
+  scheduleMidnightCheck: () => {
+    if (midnightTimerId) {
+      clearTimeout(midnightTimerId);
+      midnightTimerId = null;
+    }
+
+    const now = new Date();
+    // Use local constructor which inherently handles DST transition offsets
+    const nextMidnight = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1,
+      0,
+      0,
+      2 // 2 seconds past midnight to ensure date increment
+    );
+
+    const msUntilMidnight = Math.max(1000, nextMidnight.getTime() - now.getTime());
+
+    midnightTimerId = setTimeout(async () => {
+      // Midnight day rollover:
+      // 1. Evaluate yesterday's streak continuity
+      await get().checkStreakStatus();
+
+      // 2. Reset daily counts for the new calendar day
+      set({
+        lastEvaluatedDate: formatLocalDate(),
+        todayChecksCount: 0,
+        todayAcknowledgedCount: 0,
+        todayChecks: 0,
+        todayAcknowledged: 0,
+      });
+
+      // 3. Schedule next midnight
+      get().scheduleMidnightCheck();
+    }, msUntilMidnight);
   },
 
   addXp: async (amount: number, source: string) => {
@@ -226,7 +481,13 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
   },
 
   handleAcknowledge: async () => {
-    const { currentStreak, todayAcknowledgedCount, todayChecksCount } = get();
+    const {
+      currentStreak,
+      longestStreak,
+      todayAcknowledgedCount,
+      todayChecksCount,
+      lastCheckDate,
+    } = get();
 
     // 1. Base XP
     const baseEarned = calculateXpForAcknowledge();
@@ -241,13 +502,58 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
     const totalEarned = baseEarned + streakBonus + dailyBonus;
 
     // 4. Update stats in store
+    const todayStr = formatLocalDate();
+    let newStreak = currentStreak;
+    let newLongest = longestStreak;
+    let newLastCheckDate = lastCheckDate;
+
+    // Check if acknowledgment satisfies streak goal today (>= 80%)
+    const nextRate = calculatePostureScore(nextAckCount, Math.max(1, todayChecksCount));
+    if (nextRate >= 80 && lastCheckDate !== todayStr) {
+      // Increments streak for completing today
+      newStreak = currentStreak + 1;
+      newLongest = Math.max(longestStreak, newStreak);
+      newLastCheckDate = todayStr;
+    }
+
+    const milestone = getStreakMilestone(newStreak);
+
     set((state) => ({
       totalChecks: state.totalChecks + 1,
-      todayAcknowledgedCount: state.todayAcknowledgedCount + 1,
+      todayAcknowledgedCount: nextAckCount,
+      todayAcknowledged: nextAckCount,
+      currentStreak: newStreak,
+      longestStreak: newLongest,
+      lastCheckDate: newLastCheckDate,
     }));
+
+    // If milestone reached, emit milestone event
+    if (milestone && newStreak > currentStreak) {
+      const milestonePayload: StreakMilestonePayload = { streak: milestone };
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('streak-milestone', { detail: milestonePayload })
+        );
+      }
+      if (isTauriEnvironment()) {
+        emit('streak-milestone', milestonePayload).catch((e) => {
+          console.warn('Failed to emit streak-milestone Tauri event:', e);
+        });
+      }
+    }
 
     // 5. Add XP (handles level-up detection, events, and persistence)
     const xpResult = await get().addXp(totalEarned, 'acknowledge');
+
+    // 6. Persist streak updates to SQLite
+    updateProgress({
+      currentStreak: newStreak,
+      longestStreak: newLongest,
+      totalChecks: get().totalChecks,
+      lastCheckDate: newLastCheckDate,
+    }).catch((err) => {
+      console.error('Failed to persist streak to SQLite:', err);
+    });
 
     return {
       baseEarned,
@@ -258,6 +564,8 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
       oldLevel: xpResult.oldLevel,
       newLevel: xpResult.newLevel,
       newTitle: xpResult.newTitle,
+      streak: newStreak,
+      streakMilestone: milestone,
     };
   },
 
@@ -279,6 +587,7 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
       longestStreak: progress.longestStreak,
       totalChecks: progress.totalChecks,
       streakFreezeAvailable,
+      lastCheckDate: progress.lastCheckDate ?? null,
     });
 
     if (progress.totalXp > prevXp) {
@@ -307,6 +616,14 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
   },
 
   reset: () => {
+    if (midnightTimerId) {
+      clearTimeout(midnightTimerId);
+      midnightTimerId = null;
+    }
+    if (heartbeatTimerId) {
+      clearInterval(heartbeatTimerId);
+      heartbeatTimerId = null;
+    }
     const defaultInfo = calculateLevelFromXp(0);
     set({
       totalXp: 0,
@@ -318,8 +635,14 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
       longestStreak: 0,
       totalChecks: 0,
       streakFreezeAvailable: false,
+      freezeUsedThisWeek: false,
+      lastFreezeWeek: null,
+      lastCheckDate: null,
+      lastEvaluatedDate: formatLocalDate(),
       todayChecksCount: 0,
       todayAcknowledgedCount: 0,
+      todayChecks: 0,
+      todayAcknowledged: 0,
       isInitialized: false,
       isLoading: false,
       lastXpGain: null,

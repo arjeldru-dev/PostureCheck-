@@ -137,7 +137,7 @@ export default function DesignSystem({ onBack }: DesignSystemProps) {
   const [previewBreathing, setPreviewBreathing] = useState(true);
 
   return (
-    <div className="min-h-screen bg-theme-bg text-theme-text font-sans p-6 overflow-y-auto max-h-screen">
+    <div className="min-h-full w-full bg-theme-bg text-theme-text font-sans p-6">
       <div className="max-w-6xl mx-auto space-y-8 pb-16">
         {/* Header with Navigation and Theme Controls */}
         <header className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-theme-border">
