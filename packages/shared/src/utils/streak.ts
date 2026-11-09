@@ -250,3 +250,16 @@ export function getStreakFlameVisual(streak: number): StreakFlameVisual {
 export function isStreakFreezeUnlocked(level: number): boolean {
   return level >= STREAK_FREEZE_UNLOCK_LEVEL;
 }
+
+/**
+ * One streak freeze per ISO week, available from Level 5.
+ * `lastFreezeWeek` is the ISO week key in which the freeze was last used
+ * (persisted in SQLite as `user_progress.last_freeze_week`).
+ */
+export function isStreakFreezeAvailable(
+  level: number,
+  lastFreezeWeek: string | null | undefined,
+  date: Date = new Date()
+): boolean {
+  return level >= STREAK_FREEZE_UNLOCK_LEVEL && lastFreezeWeek !== getIsoWeekKey(date);
+}

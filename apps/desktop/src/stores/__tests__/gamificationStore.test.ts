@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { useGamificationStore } from '../gamificationStore';
-import { formatLocalDate } from '@posture-check/shared';
+import { ACHIEVEMENT_DEFINITIONS, formatLocalDate, getIsoWeekKey } from '@posture-check/shared';
+
+// Pretend every badge is already earned so XP-formula tests aren't affected by rewards
+const ALL_UNLOCKED = Object.fromEntries(
+  ACHIEVEMENT_DEFINITIONS.map((a) => [a.id, '2026-01-01T00:00:00.000Z'])
+);
 
 describe('Gamification Store', () => {
   let dispatchSpy: ReturnType<typeof vi.fn>;
@@ -78,7 +83,7 @@ describe('Gamification Store', () => {
   });
 
   it('handleAcknowledge grants exactly 10 XP base + streak bonus', async () => {
-    useGamificationStore.setState({ currentStreak: 4 });
+    useGamificationStore.setState({ currentStreak: 4, unlockedAchievements: ALL_UNLOCKED });
 
     const result = await useGamificationStore.getState().handleAcknowledge();
 
@@ -96,6 +101,7 @@ describe('Gamification Store', () => {
       currentStreak: 0,
       todayChecksCount: 5,
       todayAcknowledgedCount: 4, // 4 already acknowledged, this 5th completes the day
+      unlockedAchievements: ALL_UNLOCKED, // isolate XP formula from achievement rewards
     });
 
     const result = await useGamificationStore.getState().handleAcknowledge();
@@ -265,5 +271,51 @@ describe('Gamification Store', () => {
 
     expect(useGamificationStore.getState().streakFreezeAvailable).toBe(true);
     expect(useGamificationStore.getState().freezeUsedThisWeek).toBe(false);
+  });
+
+  describe('weekly streak freeze (persisted)', () => {
+    const progress = (overrides: Record<string, unknown>) => ({
+      id: 1,
+      totalXp: 1000, // Level 5
+      currentLevel: 5,
+      currentStreak: 3,
+      longestStreak: 3,
+      totalChecks: 10,
+      streakFreezeAvailable: true, // ignored by the store: availability is derived
+      lastCheckDate: formatLocalDate(),
+      updatedAt: new Date().toISOString(),
+      ...overrides,
+    });
+
+    it('a freeze used this week stays used after a sync, even at Level 5+', () => {
+      useGamificationStore
+        .getState()
+        .syncWithProgress(progress({ lastFreezeWeek: getIsoWeekKey() }));
+      const s = useGamificationStore.getState();
+      expect(s.streakFreezeAvailable).toBe(false);
+      expect(s.freezeUsedThisWeek).toBe(true);
+    });
+
+    it('gaining XP does not re-grant a freeze already used this week', async () => {
+      useGamificationStore.setState({
+        unlockedAchievements: ALL_UNLOCKED,
+        lastFreezeWeek: getIsoWeekKey(),
+      });
+      await useGamificationStore.getState().addXp(1000, 'test'); // reaches Level 5
+      expect(useGamificationStore.getState().currentLevel).toBeGreaterThanOrEqual(5);
+      expect(useGamificationStore.getState().streakFreezeAvailable).toBe(false);
+    });
+
+    it('a freeze used in a previous week is available again', () => {
+      useGamificationStore.getState().syncWithProgress(progress({ lastFreezeWeek: '2020-W01' }));
+      expect(useGamificationStore.getState().streakFreezeAvailable).toBe(true);
+    });
+
+    it('below Level 5 there is no freeze regardless of week', () => {
+      useGamificationStore
+        .getState()
+        .syncWithProgress(progress({ totalXp: 50, currentLevel: 1, lastFreezeWeek: null }));
+      expect(useGamificationStore.getState().streakFreezeAvailable).toBe(false);
+    });
   });
 });

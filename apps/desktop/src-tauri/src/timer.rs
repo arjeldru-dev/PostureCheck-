@@ -524,6 +524,7 @@ pub fn start_timer_engine(app: AppHandle, notify: Arc<Notify>) {
                         fired_at: Some(chrono::Utc::now().to_rfc3339()),
                         intensity_level: reminder.level,
                         message_shown: Some(picked_msg.clone()),
+                        is_test: false,
                     });
                 }
 
@@ -533,6 +534,7 @@ pub fn start_timer_engine(app: AppHandle, notify: Arc<Notify>) {
                     reminder.level,
                     Some(picked_msg),
                     Some(check_id),
+                    false,
                 );
             }
 

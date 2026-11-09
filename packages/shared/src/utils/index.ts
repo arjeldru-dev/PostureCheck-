@@ -149,3 +149,4 @@ export function getNextReminderTime(
 
 export * from './xp';
 export * from './streak';
+export * from './achievements';

@@ -147,7 +147,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   {
     id: 'early_bird',
     name: 'Early Bird',
-    description: 'Acknowledge a reminder before 7 AM',
+    description: 'Acknowledge a reminder between 4 AM and 7 AM',
     icon: '🌅',
     xp_reward: 25,
     condition_type: 'action',

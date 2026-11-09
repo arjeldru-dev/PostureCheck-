@@ -3,6 +3,8 @@ import { useThemeStore } from '@posture-check/shared';
 import DesignSystem from './pages/DesignSystem';
 import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
+import Achievements from './pages/Achievements';
+import { AchievementToast } from '@/components/gamification/AchievementToast';
 import { useTrayState } from '@/hooks/useTrayState';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useGamificationStore } from '@/stores/gamificationStore';
@@ -15,6 +17,7 @@ import {
   Palette,
   LayoutDashboard,
   CheckCircle2,
+  Trophy,
 } from 'lucide-react';
 import {
   WhisperNotification,
@@ -24,7 +27,9 @@ import {
 
 export default function App() {
   const { mode, setMode } = useThemeStore();
-  const [currentView, setCurrentView] = useState<'dashboard' | 'settings' | 'design-system'>('dashboard');
+  const [currentView, setCurrentView] = useState<
+    'dashboard' | 'achievements' | 'settings' | 'design-system'
+  >('dashboard');
   const [feedback, setFeedback] = useState<{ text: string; isError?: boolean } | null>(null);
   const isTauri = isTauriEnvironment();
 
@@ -68,7 +73,11 @@ export default function App() {
       showFeedback(`Notification shown: ${record.title}`);
     },
     onNotificationAcknowledged: (payload) => {
-      showFeedback(`✓ Sitting up! Reminder acknowledged (+${payload.xpEarned} XP) 🎉`);
+      showFeedback(
+        payload.isTest
+          ? '✓ Test reminder acknowledged (no XP for tests)'
+          : `✓ Sitting up! Reminder acknowledged (+${payload.xpEarned} XP) 🎉`
+      );
     },
     onNotificationSnoozed: (payload) => {
       showFeedback(`💤 Snoozed for ${payload.minutes} minutes`);
@@ -133,6 +142,19 @@ export default function App() {
               >
                 <LayoutDashboard className="w-3.5 h-3.5" />
                 <span>Dashboard</span>
+              </button>
+
+              <button
+                onClick={() => setCurrentView('achievements')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  currentView === 'achievements'
+                    ? 'bg-frog-green text-white font-semibold shadow-xs'
+                    : 'text-theme-muted hover:text-theme-text'
+                }`}
+                title="Open Achievements"
+              >
+                <Trophy className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Achievements</span>
               </button>
 
               <button
@@ -235,6 +257,10 @@ export default function App() {
           </div>
         )}
 
+        {currentView === 'achievements' && (
+          <Achievements onBack={() => setCurrentView('dashboard')} />
+        )}
+
         {currentView === 'settings' && (
           <Settings onBackToDashboard={() => setCurrentView('dashboard')} />
         )}
@@ -243,6 +269,9 @@ export default function App() {
           <DesignSystem onBack={() => setCurrentView('dashboard')} />
         )}
       </div>
+
+      {/* Achievement unlock toast (listens for `achievement-unlocked`) */}
+      <AchievementToast onOpen={() => setCurrentView('achievements')} />
 
       {/* Floating Action/Event Feedback Toast */}
       {feedback && (

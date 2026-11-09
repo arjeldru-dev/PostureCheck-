@@ -8,11 +8,12 @@ pub mod tray;
 use std::sync::{Arc, Mutex};
 use chrono::{DateTime, Local, NaiveTime, Weekday};
 use database::{
-    AchievementItem, Database, PersistedAppState, PostureCheck, PostureSettings,
+    AchievementItem, AchievementUnlockResult, Database, ProgressPatch, PersistedAppState, PostureCheck, PostureSettings,
     SaveSettingsInput, TodayStats, UserProgress,
 };
 use notifications::{
     acknowledge_active_notification, show_posture_notification as core_show_posture_notification,
+    show_test_posture_notification,
     snooze_active_notification, NotificationManager, NotificationRecord,
 };
 use tauri::{Emitter, Manager, State, WindowEvent};
@@ -227,7 +228,8 @@ fn acknowledge_reminder(
     let _ = app.emit("app-state-changed", &app_payload);
 
     // Update active notification status and emit notification-acknowledged with XP
-    acknowledge_active_notification(&app, ack_payload.xp_earned);
+    let mut ack_payload = ack_payload;
+    ack_payload.xp_earned = acknowledge_active_notification(&app, ack_payload.xp_earned);
 
     if let Some(notifier) = app.try_state::<TimerNotifier>() {
         notifier.0.notify_one();
@@ -432,7 +434,7 @@ fn test_notification(
     app: tauri::AppHandle,
 ) -> Result<NotificationRecord, String> {
     let clamped_level = level.clamp(1, 5);
-    core_show_posture_notification(&app, clamped_level, None)
+    show_test_posture_notification(&app, clamped_level)
 }
 
 /// Command: Close any open overlay/fullscreen windows and stop alarm audio
@@ -735,22 +737,38 @@ fn get_progress(db: State<'_, Database>) -> Result<UserProgress, String> {
     db.get_user_progress()
 }
 
-/// Command: Update user gamification progress in database and emit progress-updated
+/// Command: Atomically patch streak bookkeeping (current/longest streak,
+/// last check date, freeze week). XP/level/totals cannot be patched.
+/// The caller applies the returned progress, so no `progress-updated` is emitted.
 #[tauri::command]
-fn update_progress(
-    progress: UserProgress,
-    app: tauri::AppHandle,
-    db: State<'_, Database>,
-) -> Result<UserProgress, String> {
-    let updated = db.update_user_progress(&progress)?;
-    let _ = app.emit("progress-updated", &updated);
-    Ok(updated)
+fn patch_progress(patch: ProgressPatch, db: State<'_, Database>) -> Result<UserProgress, String> {
+    db.patch_user_progress(&patch)
+}
+
+/// Command: Atomically add XP and return the updated progress.
+#[tauri::command]
+fn add_xp(amount: u32, db: State<'_, Database>) -> Result<UserProgress, String> {
+    // Single grants above 1000 XP don't exist in the game rules
+    if amount > 1000 {
+        return Err(format!("XP amount out of range: {}", amount));
+    }
+    db.add_xp(amount)
 }
 
 /// Command: Get all achievements with unlock status
 #[tauri::command]
 fn get_achievements(db: State<'_, Database>) -> Result<Vec<AchievementItem>, String> {
     db.get_achievements()
+}
+
+/// Command: Unlock an achievement and grant its XP in one transaction (idempotent).
+/// `newlyUnlocked` is true only for the call that created the unlock.
+#[tauri::command]
+fn unlock_achievement(
+    achievement_id: String,
+    db: State<'_, Database>,
+) -> Result<AchievementUnlockResult, String> {
+    db.unlock_achievement(&achievement_id)
 }
 
 /// Command: Get today's statistics
@@ -991,8 +1009,10 @@ pub fn run() {
             save_settings,
             get_posture_history,
             get_progress,
-            update_progress,
+            patch_progress,
+            add_xp,
             get_achievements,
+            unlock_achievement,
             get_today_stats,
             get_persisted_app_state,
             save_app_state,

@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { getAchievementById } from '@posture-check/shared';
 
 export interface TrayStatePayload {
   isActive: boolean;
@@ -424,6 +425,8 @@ export interface NotificationRecord {
 export interface NotificationAcknowledgedPayload {
   id: string | null;
   xpEarned: number;
+  /** True when a Settings test notification was acknowledged (nothing is awarded). */
+  isTest?: boolean;
 }
 
 export interface NotificationSnoozedPayload {
@@ -1048,6 +1051,8 @@ export interface UserProgressPayload {
   totalChecks: number;
   streakFreezeAvailable: boolean;
   lastCheckDate?: string | null;
+  /** ISO week key (e.g. '2026-W45') in which the weekly streak freeze was last used */
+  lastFreezeWeek?: string | null;
   updatedAt: string;
 }
 
@@ -1088,18 +1093,38 @@ export async function getProgress(): Promise<UserProgressPayload> {
 }
 
 /**
- * Update user gamification progress in database
+ * Streak bookkeeping that may be patched. XP, level and total checks are
+ * deliberately absent: they only change through atomic backend increments
+ * (`addXpBackend`, `unlockAchievement`, the Rust acknowledgment).
  */
-export async function updateProgress(
-  progress: Partial<UserProgressPayload>
-): Promise<UserProgressPayload> {
+export interface ProgressPatch {
+  currentStreak?: number;
+  longestStreak?: number;
+  lastCheckDate?: string;
+  lastFreezeWeek?: string;
+}
+
+/**
+ * Atomically apply a partial streak update in SQLite (single transaction,
+ * no read-modify-write in the frontend).
+ */
+export async function patchProgress(patch: ProgressPatch): Promise<UserProgressPayload> {
   if (isTauriEnvironment()) {
-    const current = await getProgress();
-    const merged = { ...current, ...progress, updatedAt: new Date().toISOString() };
-    return await invoke<UserProgressPayload>('update_progress', { progress: merged });
+    return await invoke<UserProgressPayload>('patch_progress', { patch });
   }
-  Object.assign(mockUserProgress, progress, { updatedAt: new Date().toISOString() });
+  Object.assign(mockUserProgress, patch, { updatedAt: new Date().toISOString() });
   return { ...mockUserProgress };
+}
+
+/**
+ * Atomically add XP in SQLite. Returns the authoritative progress, or `null`
+ * outside Tauri (browser/test mode keeps XP in the store only).
+ */
+export async function addXpBackend(amount: number): Promise<UserProgressPayload | null> {
+  if (isTauriEnvironment()) {
+    return await invoke<UserProgressPayload>('add_xp', { amount });
+  }
+  return null;
 }
 
 /**
@@ -1124,6 +1149,87 @@ export async function getTodayStats(): Promise<TodayStatsPayload> {
     return await invoke<TodayStatsPayload>('get_today_stats');
   }
   return { ...mockTodayStats };
+}
+
+export interface AchievementItemPayload {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  xpReward: number;
+  conditionType: string;
+  conditionValue: number;
+  isUnlocked: boolean;
+  unlockedAt: string | null;
+}
+
+export interface UnlockAchievementPayload {
+  achievementId: string;
+  newlyUnlocked: boolean;
+  unlockedAt: string | null;
+  xpReward: number;
+  /**
+   * Authoritative progress after the XP grant (same transaction as the unlock).
+   * `null` outside Tauri, where the store applies the reward itself.
+   */
+  progress: UserProgressPayload | null;
+}
+
+// Browser/dev fallback: unlocks live in memory for the module's lifetime
+// (tests get a fresh copy via `vi.resetModules()`).
+const mockUnlockedAchievements = new Map<string, string>();
+
+/**
+ * Fetch all achievements with their unlock status from SQLite
+ */
+export async function getAchievements(): Promise<AchievementItemPayload[]> {
+  if (isTauriEnvironment()) {
+    return await invoke<AchievementItemPayload[]>('get_achievements');
+  }
+  return Array.from(mockUnlockedAchievements.entries()).map(([id, unlockedAt]) => ({
+    id,
+    name: id,
+    description: '',
+    icon: '',
+    xpReward: 0,
+    conditionType: 'action',
+    conditionValue: 1,
+    isUnlocked: true,
+    unlockedAt,
+  }));
+}
+
+/**
+ * Unlock an achievement and grant its XP in one SQLite transaction (idempotent).
+ * `newlyUnlocked` is true only for the call that actually created the unlock.
+ */
+export async function unlockAchievement(achievementId: string): Promise<UnlockAchievementPayload> {
+  if (isTauriEnvironment()) {
+    return await invoke<UnlockAchievementPayload>('unlock_achievement', { achievementId });
+  }
+  const definition = getAchievementById(achievementId);
+  if (!definition) {
+    throw new Error(`Unknown achievement: ${achievementId}`);
+  }
+  const existing = mockUnlockedAchievements.get(achievementId);
+  if (existing) {
+    return {
+      achievementId,
+      newlyUnlocked: false,
+      unlockedAt: existing,
+      xpReward: definition.xpReward,
+      progress: null,
+    };
+  }
+  const unlockedAt = new Date().toISOString();
+  mockUnlockedAchievements.set(achievementId, unlockedAt);
+  return {
+    achievementId,
+    newlyUnlocked: true,
+    unlockedAt,
+    xpReward: definition.xpReward,
+    progress: null,
+  };
 }
 
 /**

@@ -693,7 +693,16 @@ pub fn show_posture_notification(
     level: u8,
     custom_message: Option<String>,
 ) -> Result<NotificationRecord, String> {
-    show_posture_notification_with_id(app, level, custom_message, None)
+    show_posture_notification_with_id(app, level, custom_message, None, false)
+}
+
+/// Displays a test notification (Settings → "Test"). It is logged with
+/// `is_test = 1`, so acknowledging it never earns XP, stats or achievements.
+pub fn show_test_posture_notification(
+    app: &AppHandle,
+    level: u8,
+) -> Result<NotificationRecord, String> {
+    show_posture_notification_with_id(app, level, None, None, true)
 }
 
 /// Displays a posture notification with an explicit check ID
@@ -702,6 +711,7 @@ pub fn show_posture_notification_with_id(
     level: u8,
     custom_message: Option<String>,
     check_id: Option<String>,
+    is_test: bool,
 ) -> Result<NotificationRecord, String> {
     let now = Local::now();
     let is_new_check = check_id.is_none();
@@ -930,6 +940,7 @@ pub fn show_posture_notification_with_id(
                 fired_at: Some(chrono::Utc::now().to_rfc3339()),
                 intensity_level: effective_level,
                 message_shown: Some(body),
+                is_test,
             });
         }
     }
@@ -990,8 +1001,10 @@ pub fn show_posture_notification_with_id(
 }
 
 /// Helper: mark active notification as acknowledged, close overlays and emit event
-pub fn acknowledge_active_notification(app: &AppHandle, xp_earned: u32) {
+/// Returns the XP actually awarded (0 for test notifications).
+pub fn acknowledge_active_notification(app: &AppHandle, xp_earned: u32) -> u32 {
     close_overlay_windows(app);
+    let mut is_test = false;
 
     let mut target_id = None;
     if let Some(mgr) = app.try_state::<Mutex<NotificationManager>>() {
@@ -1001,26 +1014,32 @@ pub fn acknowledge_active_notification(app: &AppHandle, xp_earned: u32) {
     }
 
     if let Some(db) = app.try_state::<crate::database::Database>() {
-        if let Ok((updated_progress, newly_unlocked)) =
-            db.process_check_acknowledgment(target_id.as_deref(), xp_earned)
-        {
-            let _ = app.emit("progress-updated", &updated_progress);
-            for ach_id in newly_unlocked {
-                let _ = app.emit(
-                    "achievement-unlocked",
-                    serde_json::json!({ "achievementId": ach_id }),
-                );
+        // Achievements are detected by the frontend gamification store when it
+        // receives `notification-acknowledged` (emitted below, after this update).
+        match db.process_check_acknowledgment(target_id.as_deref(), xp_earned) {
+            Ok((updated_progress, true)) => {
+                let _ = app.emit("progress-updated", &updated_progress);
+            }
+            Ok((_, false)) => {
+                // Test notification: acknowledged, but nothing is awarded
+                is_test = true;
+            }
+            Err(e) => {
+                eprintln!("Failed to process acknowledgment: {}", e);
             }
         }
     }
 
+    let effective_xp = if is_test { 0 } else { xp_earned };
     let _ = app.emit(
         "notification-acknowledged",
         serde_json::json!({
             "id": target_id,
-            "xpEarned": xp_earned
+            "xpEarned": effective_xp,
+            "isTest": is_test
         }),
     );
+    effective_xp
 }
 
 /// Helper: mark active notification as snoozed, close overlays and emit event

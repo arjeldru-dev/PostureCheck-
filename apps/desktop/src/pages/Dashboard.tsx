@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   CheckCircle2,
   Coffee,
@@ -23,6 +23,9 @@ import { useGamificationStore } from '@/stores/gamificationStore';
 import { getProgress, getTodayStats, type UserProgressPayload, type TodayStatsPayload } from '@/lib/tauri';
 import { playAcknowledgeSound, playCelebrationSound } from '@/lib/audio';
 import { defaultRotationEngine } from '@posture-check/shared';
+
+/** Unlocks arriving within this window are celebrated together. */
+const ACHIEVEMENT_CELEBRATION_BATCH_MS = 300;
 
 export interface DashboardProps {
   onOpenSettings?: () => void;
@@ -91,8 +94,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const currentStreak = useGamificationStore((s) => s.currentStreak);
   const streakFreezeAvailable = useGamificationStore((s) => s.streakFreezeAvailable);
   const freezeUsedThisWeek = useGamificationStore((s) => s.freezeUsedThisWeek);
+  const pendingCelebrations = useGamificationStore((s) => s.pendingCelebrations);
 
   const [isAcknowledging, setIsAcknowledging] = useState(false);
+  // Timestamp of the last achievement celebration, so the routine
+  // acknowledgment message doesn't immediately replace it.
+  const lastAchievementCelebrationRef = useRef(0);
 
   // Fetch updated stats from SQLite or mock
   const refreshStats = useCallback(async () => {
@@ -154,6 +161,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
     };
   }, [triggerCelebrating, triggerDisappointed, triggerEncouraging, onShowFeedback]);
 
+  // Achievement celebrations are queued in the store, so unlocks that happen
+  // while Ribbit isn't on screen (Settings, Achievements page) still get
+  // celebrated when the Dashboard is shown. Unlocks arriving within a short
+  // window are batched into ONE celebration and ONE sound.
+  useEffect(() => {
+    if (pendingCelebrations.length === 0) return;
+    const timer = setTimeout(() => {
+      const batch = useGamificationStore.getState().consumeCelebrations();
+      if (batch.length === 0) return;
+      lastAchievementCelebrationRef.current = Date.now();
+      playCelebrationSound();
+      const xp = batch.reduce((sum, a) => sum + a.xpReward, 0);
+      triggerCelebrating(
+        batch.length === 1
+          ? `${batch[0].icon} Achievement unlocked: ${batch[0].name}! +${xp} XP 🎉`
+          : `${batch.map((a) => a.icon).join('')} ${batch.length} achievements unlocked: ${batch
+              .map((a) => a.name)
+              .join(', ')}! +${xp} XP 🎉`
+      );
+    }, ACHIEVEMENT_CELEBRATION_BATCH_MS);
+    return () => clearTimeout(timer);
+  }, [pendingCelebrations, triggerCelebrating]);
+
   // Handle reminder acknowledgment
   const handleAcknowledge = async () => {
     if (isAcknowledging) return;
@@ -173,7 +203,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           [7, 14, 30, 60, 100].includes(newProg.currentStreak)
       );
 
-      const xpEarned = res?.xpEarned || 10;
+      // 0 is meaningful (acknowledged test notification) — don't default it away
+      const xpEarned = res?.xpEarned ?? 10;
 
       if (hasLeveledUp && newProg) {
         playCelebrationSound();
@@ -181,12 +212,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
           `🌟 LEVEL UP! You reached Level ${newProg.currentLevel}! Golden lily pad unlocked! 🏆🎉`
         );
         onShowFeedback?.(`🎉 Level Up! You reached Level ${newProg.currentLevel}!`);
-      } else if (!hitStreakMilestone) {
-        // Milestone celebration is handled by the 'streak-milestone' event listener
+      } else if (
+        !hitStreakMilestone &&
+        Date.now() - lastAchievementCelebrationRef.current > 5000
+      ) {
+        // Milestone and achievement celebrations are handled by their event listeners
         playAcknowledgeSound();
         const ackMsg = defaultRotationEngine.getAcknowledgmentMessage();
-        triggerEncouraging(`+${xpEarned} XP! 🐸 ${ackMsg}`);
-        onShowFeedback?.(`✓ Posture verified! +${xpEarned} XP earned 🎉`);
+        if (xpEarned > 0) {
+          triggerEncouraging(`+${xpEarned} XP! 🐸 ${ackMsg}`);
+          onShowFeedback?.(`✓ Posture verified! +${xpEarned} XP earned 🎉`);
+        } else {
+          triggerEncouraging(`🐸 ${ackMsg}`);
+          onShowFeedback?.('✓ Test reminder acknowledged (no XP for tests)');
+        }
       }
     } catch (err) {
       console.error('Failed to acknowledge posture check:', err);

@@ -25,6 +25,7 @@ import {
   type SaveSettingsPayload,
 } from '@/lib/tauri';
 import { useThemeStore, type ThemeMode, type MascotTone } from '@posture-check/shared';
+import { useGamificationStore } from './gamificationStore';
 
 export interface QuickProfile {
   id: string;
@@ -141,7 +142,7 @@ function mapPayloadToProfile(payload: PostureSettingsPayload): QuickProfile {
   };
 }
 
-export const useSettingsStore = create<SettingsStoreState>((set) => ({
+export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
   id: '00000000-0000-0000-0000-000000000001',
   profileName: 'Default',
   intervalMinutes: 30,
@@ -251,6 +252,7 @@ export const useSettingsStore = create<SettingsStoreState>((set) => ({
 
   setIntensityLevel: async (level: number) => {
     const clamped = Math.min(5, Math.max(1, level));
+    const changed = clamped !== get().intensityLevel;
     set({ intensityLevel: clamped });
 
     try {
@@ -258,6 +260,15 @@ export const useSettingsStore = create<SettingsStoreState>((set) => ({
       await tauriSaveSettings({ intensityLevel: clamped });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) });
+      return;
+    }
+
+    // "Customizer" achievement — only for a real, successfully saved change
+    if (changed) {
+      useGamificationStore
+        .getState()
+        .evaluateAchievements({ type: 'setting_change', setting: 'intensity' })
+        .catch((err) => console.error('Failed to evaluate Customizer achievement:', err));
     }
   },
 
